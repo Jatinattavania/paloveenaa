@@ -1,0 +1,21 @@
+﻿{
+  "name": "paloveenaa-website",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Paloveenaa store - static HTML + Tailwind CSS + JavaScript (converted from WordPress)",
+  "scripts": {
+    "dev": "node src/dev.mjs",
+    "images": "node src/images.mjs",
+    "build:html": "node src/build.mjs",
+    "build:css": "tailwindcss -i src/styles/input.css -o website/assets/css/styles.css --minify",
+    "build": "npm run build:html && npm run build:css",
+    "watch:css": "tailwindcss -i src/styles/input.css -o website/assets/css/styles.css --watch",
+    "start": "http-server website -p 8080 -c-1"
+  },
+  "devDependencies": {
+    "firebase": "10.14.1",
+    "http-server": "14.1.1",
+    "sharp": "0.33.5",
+    "tailwindcss": "3.4.17"
+  }
+}

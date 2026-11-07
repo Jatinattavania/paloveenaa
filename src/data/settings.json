@@ -1,0 +1,42 @@
+{
+  "siteName": "Paloveenaa",
+  "siteUrl": "https://paloveenaa.com",
+  "description": "Paloveenaa – elegant ethnic wear for women: Anarkalis, Lehengas, Coord Sets and Indo Western outfits, crafted to make you feel confident and beautiful.",
+  "email": "info@paloveenaa.com",
+  "phone": "",
+  "whatsapp": "",
+  "address": "Haryana, India",
+
+  "announcements": [
+    "One Day Delivery Available in India",
+    "Free Shipping on Orders over ₹50",
+    "25% OFF Store Wide Use Code : DISB"
+  ],
+
+  "social": {
+    "instagram": "",
+    "facebook": "",
+    "linkedin": "",
+    "x": ""
+  },
+
+  "shop": {
+    "freeShippingOver": 50,
+    "shippingFee": 0,
+    "coupons": { "DISB": 25 }
+  },
+
+  "firebase": {
+    "_help": "Mobile-number login. Create a Firebase project, enable Authentication > Phone, add a Web app and paste its config values here (they are public identifiers, not secrets). See README > Login.",
+    "apiKey": "AIzaSyAOtj3miB8nHsX89zWB9y7MzF-hhw1fJP4",
+    "authDomain": "otp-c2f2a.firebaseapp.com",
+    "projectId": "otp-c2f2a",
+    "appId": "1:1004835993742:web:7e1fdc98585f5d9ce8b1df"
+  },
+
+  "forms": {
+    "_help": "Leave endpoint empty to send orders/messages by opening the customer's email app (to the email above). To receive them directly, create a free form at https://web3forms.com or https://formspree.io and paste the URL/key here.",
+    "endpoint": "",
+    "web3formsKey": ""
+  }
+}

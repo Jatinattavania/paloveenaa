@@ -1,0 +1,76 @@
+{
+  "home": {
+    "slides": [
+      { "image": "banner-1", "alt": "Elevate your everyday style – shop the collection", "link": "/shop/" },
+      { "image": "banner-2", "alt": "Elegance in every thread – shop the collection", "link": "/shop/" },
+      { "image": "banner-3", "alt": "Paloveenaa new collection", "link": "/shop/" },
+      { "image": "banner-4", "alt": "Redefine your wardrobe – feel beautiful every day", "link": "/shop/" },
+      { "image": "banner-5", "alt": "Paloveenaa festive collection", "link": "/shop/" }
+    ],
+    "latestProducts": {
+      "title": "Latest Products",
+      "text": "Nulla tincidunt convallis bibendum. Sed egestas, nisi purus vestibulum augue, at iaculis."
+    },
+    "brandStory": {
+      "image": "IMG_2700",
+      "title": "Our Brand Story",
+      "text": "Nunc vehicula quam semper odio varius tincidunt. Vestibulum ante ipsum primis in faucibus orci luctus et ultrices po suere cubilia curae; Proin luctus quam neque, vitae porta dui porta vel. Morbi eu nibh auctor, blandit erat cursus, venenatis nibh. Donec semper tellus non magna lacinia, at condimentum dui tincidunt. Cras malesuada, sem vel luc tus consequat, diam massa imperdiet arcu, a ultricies nibh mi vel dui. Nunc eget tempor neque, ique lectus.",
+      "button": { "text": "View Full Story", "link": "/about/" }
+    },
+    "categories": {
+      "title": "Browse Categories",
+      "button": { "text": "View All", "link": "/shop/" }
+    },
+    "lookbook": [
+      { "title": "Outfits That Make You Shine", "text": "At imperdiet dui accumsan sit amet. Eros in cursus turpis massa. Dui id ornare arcu odio ut. Cras fermentum odio eu feugiat pretium sit amet facilisis magna.", "image": "IMG_2689", "button": "Shop Collection", "link": "/shop/" },
+      { "title": "Find Recent Trending Brands", "text": "Aliquam Nulla tincidunt convallis bibendum. Duis sed risus suscipit justo maximus pulvinar. Integer neque felis, egestas a euismod in, pulvinar et nisl Aliquam ullam.", "image": "IMG_2621", "button": "Shop Collection", "link": "/shop/" },
+      { "title": "New Style Unique Designs", "text": "Duis sed risus suscipit justo maximus pulvinar. Integer neque felis, egestas a euismod in, pulvinar et nisl Aliquam ullam. Nulla tincidunt convallis bibendum.", "image": "IMG_2643", "button": "Shop Collection", "link": "/shop/" },
+      { "title": "Fashionable Ethinic Wears", "text": "Integer neque felis, egestas a euismod in, pulvinar et nisl Aliquam ullam. Nulla tincidunt convallis bibendum. Duis sed risus suscipit justo maximus pulvinar.", "image": "IMG_2661", "button": "Shop Collection", "link": "/shop/" }
+    ],
+    "blogTitle": "Latest Blogs"
+  },
+
+  "instagram": {
+    "title": "#Paloveenaa",
+    "images": ["IMG_2690", "IMG_2759", "IMG_2619", "IMG_2652", "IMG_2641", "IMG_2663", "IMG_2703"]
+  },
+
+  "features": [
+    { "icon": "free-shipping.png", "title": "Free Shipping", "text": "Free Shipping World wide" },
+    { "icon": "secure-payment.png", "title": "Secured Payment", "text": "Safe & Secured Payments" },
+    { "icon": "support.png", "title": "24/7 Support", "text": "Support Arround The Clock" }
+  ],
+
+  "about": {
+    "intro": {
+      "title": "We keep up with the most recent trends",
+      "text": "Morbi eu nibh auctor, blandit erat cursus, venenatis nibh. Donec semper tellus non magna lacinia, at condimentum dui tincidunt. Cras malesuada, sem vel luc tus consequat, diam massa imperdiet arcu, a ultricies nibh mi vel dui. Nunc eget tempor neque, ique lectus. Nunc vehicula quam semper odio varius tincidunt. Vestibulum ante ipsum primis in faucibus orci luctus et ultrices posuere cubilia curae; Proin luctus quam neque, vitae porta dui porta vel.",
+      "author": "Ninja Morish - CEO"
+    },
+    "rows": [
+      { "image": "IMG_2630", "title": "PellentePellentesque vel seodales diam Nunc feugiat facilisis purus eu.", "text": "Suspendisse imperdiet libero euismod bibendum consequat. Phasellus impe rdiet sem neque, ac bibendum eros ultrices ut. Curabitur vel ultrices enim. Sed convallis mauris ac nibh lacinia efficitur. Phasellus vitae laoreet elit, ut tempor lectus. Etiam scelerisque justo nisi, a malesuada nisi.", "signature": "signature-1.png", "name": "Kylie Jenner" },
+      { "image": "IMG_2702", "title": "Vel Seodales Pellente Sellentesque Diam Nunc Feugiat Facilisis Purus Eu.", "text": "Curabitur vel ultrices enim. Sed convallis mauris ac nibh lacinia efficitur. Phasellus vitae laoreet elit, ut tempor lectus. Etiam scelerisque justo nisi, a malesuada nisi. Suspendisse imperdiet libero euismod bibendum consequat. Phasellus impe rdiet sem neque, ac bibendum eros ultrices ut.", "signature": "signature-2.png", "name": "Adin Ross" }
+    ],
+    "affiliates": {
+      "title": "Our Corporate Affiliates",
+      "text": "Sorbi eget mauris ultrices, interdum purus quis, bibendum mi. Ut vel dui aliquam, tempor dolor vehicula, elementum turpis. Sed mi tellus, fermentum at scelerisque eu, eumod in nibh. Proin cursus est at lectus convallis, in tristique mi laoree Interdum.",
+      "logos": ["brand-2.svg", "brand-6.svg", "brand-5.svg", "brand-4.svg", "brand-3.svg", "brand-1.svg", "brand-8.svg", "brand-7.svg", "brand-9.svg"]
+    }
+  },
+
+  "faq": [
+    { "q": "How can I determine the best size for me?", "a": "Fusce id blandit blandit finibus eros. Vestibulum eu maximus turpis. Ut enim mas da id scelerisque eu, volutpat id mi. imus turpis. Ut enim massa, malesuad mi. Maecenas in odo lorem.Maecenas in dictum at commodo lorem." },
+    { "q": "What shipping alternatives do you offer?", "a": "Maecenas in odo lorem.Maecenas in dictum at commodo lorem. Fusce id blandit blandit finibus eros. Vestibulum eu maximus turpis. Ut enim mas da id scelerisque eu, volutpat id mi. imus turpis. Ut enim massa, malesuad mi." },
+    { "q": "If I have any other questions, how can I reach you?", "a": "Zesce id blandit blandit finibus eros. Vestibulum eu maximus turpis. Ut enim mas da id scelerisque eu, volutpat id mi. imus turpis. Ut enim massa, malesuad mi. Maecenas in odo lorem.Maecenas in dictum at commodo lorem." },
+    { "q": "How do I track my order?", "a": "Aiecenas in odo lorem.Maecenas in dictum at commodo lorem. Fusce id blandit blandit finibus eros. Vestibulum eu maximus turpis. Ut enim mas da id scelerisque eu, volutpat id mi. imus turpis. Ut enim massa, malesuad mi." },
+    { "q": "How can I use a promo code or coupon?", "a": "Ut enim mas da id scelerisque eu, volutpat id mi. imus turpis. Ut enim massa, malesuad mi. Maecenas in odo lorem.Maecenas in dictum at commodo lorem. Fusce id blandit blandit finibus eros. Vestibulum eu maximus turpis." },
+    { "q": "What are your policies regarding returns?", "a": "Ut enim massa, malesuad mi. Maecenas in odo lorem.Maecenas in dictum at commodo lorem. Fusce id blandit blandit finibus eros. Vestibulum eu maximus turpis. Ut enim mas da id scelerisque eu, volutpat id mi. imus turpis." },
+    { "q": "How do I request a refund?", "a": "Blandit blandit fusce id finibus eros. Vestibulum eu maximus turpis. Ut enim mas da id scelerisque eu, volutpat id mi. imus turpis. Ut enim massa, malesuad mi. Maecenas in odo lorem.Maecenas in dictum at commodo lorem." }
+  ],
+
+  "contact": {
+    "image": "IMG_2690",
+    "title": "Feel Free To Contact Us",
+    "text": "Porttitor eget dolor morbi non arcu risus quis varius. Venenatis a condimentum vitae sapien pellentesque habitant morbi tristique."
+  }
+}

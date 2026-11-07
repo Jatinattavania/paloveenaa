@@ -1,0 +1,23 @@
+# --- Private: never publish ---------------------------------------------
+# Old WordPress site: contains wp-config.php (database password) and the
+# database dump (customer/admin data).
+wordpress/
+# Business documents
+*.pdf
+# Old holding page (not part of the new site)
+coming-soon/
+# Local secrets, if ever added
+.env
+.env.*
+
+# --- Tools ---------------------------------------------------------------
+node_modules/
+
+# --- Generated -------------------------------------------------------------
+# The HTML/CSS/JS in website/ is rebuilt by `npm run build` (and by GitHub
+# Actions on every push). Only the optimised images are committed, because
+# generating them needs the original photos + `npm run images`.
+website/*
+!website/assets/
+website/assets/*
+!website/assets/images/

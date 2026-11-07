@@ -1,0 +1,76 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@font-face {
+  font-family: 'Jost';
+  src: url('../fonts/jost.woff2') format('woff2');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@layer base {
+  html { -webkit-tap-highlight-color: transparent; }
+  body { @apply font-sans text-[15px] leading-relaxed text-muted bg-white antialiased; }
+  h1, h2, h3, h4, h5, h6 { @apply text-ink font-medium leading-tight; }
+  :focus-visible { @apply outline-2 outline-offset-2 outline-brand; }
+  [hidden] { display: none !important; }
+}
+
+@layer components {
+  .container-site { @apply mx-auto w-full max-w-site px-4 sm:px-6 xl:px-0; }
+
+  .btn { @apply inline-flex items-center justify-center gap-2 rounded-md px-8 py-3.5 text-sm font-medium uppercase tracking-[0.2em] transition-colors duration-200 disabled:opacity-60 disabled:cursor-not-allowed; }
+  .btn-brand { @apply btn bg-brand text-white hover:bg-ink; }
+  .btn-outline { @apply btn border-2 border-brand text-ink hover:bg-brand hover:text-white; }
+  .btn-dark { @apply btn bg-ink text-white hover:bg-brand; }
+
+  .section-title { @apply text-3xl md:text-[35px] font-medium text-ink; }
+
+  .field { @apply w-full rounded-md border border-transparent bg-[#F8F8F8] px-6 py-4 text-ink placeholder:text-muted/80 focus:border-brand focus:bg-white focus:outline-none transition; }
+  .field-label { @apply mb-1.5 block text-sm font-medium text-ink; }
+
+  .icon-btn { @apply relative inline-flex h-10 w-10 items-center justify-center rounded-full text-ink transition hover:text-brand; }
+  .badge-count { @apply absolute -right-0.5 -top-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-brand px-1 text-[10px] font-semibold leading-none text-white; }
+
+  .arrow-btn { @apply inline-flex h-9 w-9 items-center justify-center rounded-full bg-white text-ink shadow-[0_4px_14px_rgba(0,0,0,0.12)] transition hover:bg-brand hover:text-white disabled:opacity-40; }
+
+  /* Rich text from the old WordPress posts/pages */
+  .prose-content { @apply text-[15px] leading-[1.75]; }
+  .prose-content h2 { @apply mt-10 mb-4 text-3xl md:text-[40px] font-medium; }
+  .prose-content h3 { @apply mt-8 mb-3 text-2xl font-medium; }
+  .prose-content p { @apply mb-5; }
+  .prose-content ul { @apply mb-5 list-disc space-y-2 pl-6; }
+  .prose-content ol { @apply mb-5 list-decimal space-y-2 pl-6; }
+  .prose-content strong, .prose-content b { @apply font-semibold text-ink/70; }
+  .prose-content a { @apply text-brand underline underline-offset-2; }
+}
+
+@layer utilities {
+  .no-scrollbar { scrollbar-width: none; }
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  /* relative: keeps absolutely-positioned children (e.g. sr-only labels) inside the scroll area */
+  .snap-row { @apply relative flex snap-x snap-mandatory overflow-x-auto scroll-smooth no-scrollbar; }
+  .text-shadow { text-shadow: 0 2px 12px rgba(0, 0, 0, 0.25); }
+}
+
+/* FAQ accordion (native <details>) */
+details > summary { list-style: none; }
+details > summary::-webkit-details-marker { display: none; }
+details[open] .faq-arrow { transform: rotate(180deg); }
+details[open] summary { color: theme('colors.brand.DEFAULT'); }
+
+/* Drawers & modal */
+.drawer { transition: transform 0.3s ease, visibility 0.3s; }
+.overlay { transition: opacity 0.3s ease, visibility 0.3s; }
+
+/* Mega menu: open on hover (desktop) or when toggled */
+.has-mega:hover .mega, .has-mega:focus-within .mega, .mega.is-open { opacity: 1; visibility: visible; transform: translateY(0); }
+
+/* Toast */
+.toast { transition: opacity 0.25s ease, transform 0.25s ease; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
+}

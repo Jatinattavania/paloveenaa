@@ -1,0 +1,242 @@
+{
+  "currency": {
+    "code": "INR",
+    "symbol": "₹",
+    "decimals": 2
+  },
+  "categories": [
+    {
+      "slug": "indowestern",
+      "name": "Indo Western",
+      "shortName": "Indo Western",
+      "image": "IMG_2760",
+      "description": ""
+    },
+    {
+      "slug": "anarkali",
+      "name": "Anarkali",
+      "shortName": "Anarkali",
+      "image": "IMG_2689",
+      "description": ""
+    },
+    {
+      "slug": "coord-sets",
+      "name": "Coord Sets",
+      "shortName": "Coord Sets",
+      "image": "IMG_2642",
+      "description": ""
+    },
+    {
+      "slug": "founders-favourite",
+      "name": "Founders Favourite",
+      "shortName": "Favourite",
+      "image": "IMG_2630",
+      "description": ""
+    },
+    {
+      "slug": "lehenga",
+      "name": "Lehenga",
+      "shortName": "Lehenga",
+      "image": "IMG_2650",
+      "description": ""
+    }
+  ],
+  "products": [
+    {
+      "id": 1952,
+      "slug": "product-9",
+      "name": "Product 9",
+      "regularPrice": 1999,
+      "salePrice": 1499,
+      "sku": "",
+      "inStock": true,
+      "categories": [
+        "anarkali"
+      ],
+      "image": "IMG_2687",
+      "gallery": [
+        "IMG_2688",
+        "IMG_2689",
+        "IMG_2690",
+        "IMG_2691",
+        "IMG_2692"
+      ],
+      "shortDescription": "",
+      "description": "",
+      "date": "2026-06-21"
+    },
+    {
+      "id": 1948,
+      "slug": "product-8",
+      "name": "Product 8",
+      "regularPrice": 1999,
+      "salePrice": 1499,
+      "sku": "",
+      "inStock": true,
+      "categories": [
+        "indowestern"
+      ],
+      "image": "IMG_2759",
+      "gallery": [
+        "IMG_2760",
+        "IMG_2761"
+      ],
+      "shortDescription": "",
+      "description": "",
+      "date": "2026-06-21"
+    },
+    {
+      "id": 1908,
+      "slug": "product-1",
+      "name": "Product 1",
+      "regularPrice": 1999,
+      "salePrice": 1499,
+      "sku": "",
+      "inStock": true,
+      "categories": [
+        "lehenga"
+      ],
+      "image": "IMG_2701",
+      "gallery": [
+        "IMG_2700",
+        "IMG_2702",
+        "IMG_2703",
+        "IMG_2704",
+        "IMG_2705"
+      ],
+      "shortDescription": "",
+      "description": "",
+      "date": "2026-06-21"
+    },
+    {
+      "id": 1915,
+      "slug": "product-2",
+      "name": "Product 2",
+      "regularPrice": 1999,
+      "salePrice": 1499,
+      "sku": "",
+      "inStock": true,
+      "categories": [
+        "coord-sets"
+      ],
+      "image": "IMG_2661",
+      "gallery": [
+        "IMG_2660",
+        "IMG_2662",
+        "IMG_2663",
+        "IMG_2664"
+      ],
+      "shortDescription": "",
+      "description": "",
+      "date": "2026-06-21"
+    },
+    {
+      "id": 1921,
+      "slug": "product-3",
+      "name": "Product 3",
+      "regularPrice": 1999,
+      "salePrice": 1499,
+      "sku": "",
+      "inStock": true,
+      "categories": [
+        "founders-favourite",
+        "lehenga"
+      ],
+      "image": "IMG_2630",
+      "gallery": [
+        "IMG_2628",
+        "IMG_2629"
+      ],
+      "shortDescription": "",
+      "description": "",
+      "date": "2026-06-21"
+    },
+    {
+      "id": 1925,
+      "slug": "product-4",
+      "name": "Product 4",
+      "regularPrice": 1999,
+      "salePrice": 1499,
+      "sku": "",
+      "inStock": true,
+      "categories": [
+        "coord-sets"
+      ],
+      "image": "IMG_2642",
+      "gallery": [
+        "IMG_2641",
+        "IMG_2643",
+        "IMG_2644",
+        "IMG_2645"
+      ],
+      "shortDescription": "",
+      "description": "",
+      "date": "2026-06-21"
+    },
+    {
+      "id": 1931,
+      "slug": "product-5",
+      "name": "Product 5",
+      "regularPrice": 1999,
+      "salePrice": 1499,
+      "sku": "",
+      "inStock": true,
+      "categories": [
+        "anarkali"
+      ],
+      "image": "IMG_2650",
+      "gallery": [
+        "IMG_2651",
+        "IMG_2652",
+        "IMG_2653"
+      ],
+      "shortDescription": "",
+      "description": "",
+      "date": "2026-06-21"
+    },
+    {
+      "id": 1936,
+      "slug": "product-6",
+      "name": "Product 6",
+      "regularPrice": 1999,
+      "salePrice": 1499,
+      "sku": "",
+      "inStock": true,
+      "categories": [
+        "coord-sets"
+      ],
+      "image": "IMG_2616",
+      "gallery": [
+        "IMG_2615",
+        "IMG_2617",
+        "IMG_2618",
+        "IMG_2619",
+        "IMG_2620",
+        "IMG_2621"
+      ],
+      "shortDescription": "",
+      "description": "",
+      "date": "2026-06-21"
+    },
+    {
+      "id": 1944,
+      "slug": "product-7",
+      "name": "Product 7",
+      "regularPrice": 1999,
+      "salePrice": 1499,
+      "sku": "",
+      "inStock": true,
+      "categories": [
+        "coord-sets"
+      ],
+      "image": "IMG_2603",
+      "gallery": [
+        "IMG_2604",
+        "IMG_2605"
+      ],
+      "shortDescription": "",
+      "description": "",
+      "date": "2026-06-21"
+    }
+  ]
+}
