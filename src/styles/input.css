@@ -65,8 +65,22 @@ details[open] summary { color: theme('colors.brand.DEFAULT'); }
 .drawer { transition: transform 0.3s ease, visibility 0.3s; }
 .overlay { transition: opacity 0.3s ease, visibility 0.3s; }
 
-/* Mega menu: open on hover (desktop) or when toggled */
-.has-mega:hover .mega, .has-mega:focus-within .mega, .mega.is-open { opacity: 1; visibility: visible; transform: translateY(0); }
+/* Mega menu (desktop). Hidden state: faded + nudged down. It closes after a short delay so moving the
+   mouse diagonally from "Shop" to the panel doesn't drop it. Only the Tailwind translate-y variable is
+   changed, so the centring translate-x stays intact. */
+.mega {
+  opacity: 0;
+  visibility: hidden;
+  --tw-translate-y: 0.5rem;
+  transition: opacity 0.2s ease, transform 0.2s ease, visibility 0s linear 0.25s;
+}
+.has-mega:hover .mega, .has-mega:focus-within .mega {
+  opacity: 1;
+  visibility: visible;
+  --tw-translate-y: 0px;
+  transition-delay: 0s;
+}
+.has-mega:hover > a .mega-chevron, .has-mega:focus-within > a .mega-chevron { transform: rotate(180deg); }
 
 /* Toast */
 .toast { transition: opacity 0.25s ease, transform 0.25s ease; }

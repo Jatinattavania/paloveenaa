@@ -31,7 +31,7 @@ const withBase = (html) =>
 
 // Content-Security-Policy: only this site plus the exact Google/Firebase services the login needs may run code
 // or be contacted. This is the main defence against injected scripts (XSS) stealing a login session.
-const FIREBASE_VERSION = '10.14.1';
+const FIREBASE_VERSION = '13.1.0'; // keep in sync with package.json and the imports in src/js/auth.js
 const fb = settings.firebase || {};
 const originOf = (u) => { try { return new URL(u).origin; } catch { return ''; } };
 const cspDirectives = {
@@ -86,6 +86,7 @@ page('/checkout/', P.checkout);
 page('/order-received/', P.orderReceived);
 page('/wishlist/', P.wishlist);
 page('/login/', P.login);
+page('/register/', P.register);
 page('/account/', P.account);
 page('/privacy-policy/', (c) => P.policy(c, 'privacy-policy'));
 page('/refund-returns/', (c) => P.policy(c, 'refund-returns'));
@@ -138,7 +139,7 @@ writeFileSync(
 // SEO files.
 const today = new Date().toISOString().slice(0, 10);
 writeFileSync(path.join(OUT, 'sitemap.xml'), `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${written.map((u) => `  <url><loc>${settings.siteUrl}${u}</loc><lastmod>${today}</lastmod></url>`).join('\n')}\n</urlset>\n`);
-writeFileSync(path.join(OUT, 'robots.txt'), `User-agent: *\nDisallow: /cart/\nDisallow: /checkout/\nDisallow: /order-received/\nDisallow: /wishlist/\nDisallow: /login/\nDisallow: /account/\n\nSitemap: ${settings.siteUrl}/sitemap.xml\n`);
+writeFileSync(path.join(OUT, 'robots.txt'), `User-agent: *\nDisallow: /cart/\nDisallow: /checkout/\nDisallow: /order-received/\nDisallow: /wishlist/\nDisallow: /login/\nDisallow: /register/\nDisallow: /account/\n\nSitemap: ${settings.siteUrl}/sitemap.xml\n`);
 
 // Apache/LiteSpeed (Hostinger) config: old WordPress URLs -> new URLs, caching, compression.
 const redirects = [

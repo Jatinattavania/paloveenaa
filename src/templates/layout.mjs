@@ -1,5 +1,5 @@
 // Page shell: <head>, announcement bar, header, drawers, footer.
-import { esc, icon, IMG, productImg } from './helpers.mjs';
+import { esc, icon, IMG, productImg, honeypot } from './helpers.mjs';
 
 const NAV = [
   { label: 'Home', href: '/' },
@@ -58,8 +58,9 @@ function announcementBar(ctx) {
 }
 
 function megaMenu(ctx) {
-  return `<div class="mega invisible absolute left-1/2 top-full z-40 w-screen max-w-[1180px] -translate-x-1/2 translate-y-2 pt-3 opacity-0 transition duration-200">
-  <div class="rounded-lg bg-white p-6 shadow-[0_20px_50px_rgba(0,0,0,0.12)]">
+  // Positioned against the full-width header (not the <li>), centred on the page.
+  return `<div class="mega absolute left-1/2 top-full z-40 w-[calc(100vw-2rem)] max-w-[1140px] -translate-x-1/2 transform">
+  <div class="rounded-b-lg border-t border-line bg-white p-6 shadow-[0_20px_50px_rgba(0,0,0,0.12)]">
     <div class="grid grid-cols-5 gap-5">
       ${ctx.catalog.categories
         .map(
@@ -77,16 +78,16 @@ function megaMenu(ctx) {
 function header(ctx) {
   const path = ctx.path;
   const link = (n) =>
-    `<a href="${n.href}" class="inline-flex items-center gap-1 py-2 text-[17px] transition hover:text-brand ${isActive(n.href, path) ? 'text-muted' : 'text-ink'}"${isActive(n.href, path) ? ' aria-current="page"' : ''}>${esc(n.label)}${n.mega ? icon('chevronDown', 'h-3.5 w-3.5 mt-0.5') : ''}</a>`;
+    `<a href="${n.href}" class="inline-flex items-center gap-1 py-2 text-[17px] transition hover:text-brand ${isActive(n.href, path) ? 'text-muted' : 'text-ink'}"${isActive(n.href, path) ? ' aria-current="page"' : ''}>${esc(n.label)}${n.mega ? icon('chevronDown', 'mega-chevron mt-0.5 h-3.5 w-3.5 transition-transform duration-200') : ''}</a>`;
   return `<header class="relative z-30 bg-white">
   <div class="mx-auto flex h-[78px] max-w-[1140px] items-center justify-between gap-4 px-4 sm:px-6 lg:h-[105px] xl:px-0">
     <button type="button" class="icon-btn -ml-2 lg:hidden" data-open="mobile-menu" aria-label="Open menu" aria-controls="mobile-menu">${icon('menu', 'h-6 w-6')}</button>
     <a href="/" class="shrink-0" aria-label="${esc(ctx.settings.siteName)} home">
       <img src="${IMG}/brand/logo-240.webp" srcset="${IMG}/brand/logo-240.webp 1x, ${IMG}/brand/logo-480.webp 2x" width="110" height="61" alt="${esc(ctx.settings.siteName)}" class="h-[50px] w-auto lg:h-[61px]">
     </a>
-    <nav class="hidden lg:block" aria-label="Main">
-      <ul class="flex items-center gap-8">
-        ${NAV.map((n) => (n.mega ? `<li class="has-mega">${link(n)}${megaMenu(ctx)}</li>` : `<li>${link(n)}</li>`)).join('')}
+    <nav class="hidden self-stretch lg:flex" aria-label="Main">
+      <ul class="flex h-full items-center gap-8">
+        ${NAV.map((n) => (n.mega ? `<li class="has-mega flex h-full items-center">${link(n)}${megaMenu(ctx)}</li>` : `<li>${link(n)}</li>`)).join('')}
       </ul>
     </nav>
     <div class="-mr-2 flex items-center gap-1">
@@ -216,6 +217,7 @@ function footer(ctx) {
     <div>
       <h2 class="mb-5 text-xl font-medium text-brand">Sign up for Newsletter</h2>
       <form class="flex" data-form="newsletter" novalidate>
+        ${honeypot}
         <label for="newsletter-email" class="sr-only">Your email address</label>
         <input id="newsletter-email" name="email" type="email" required autocomplete="email" placeholder="Your email address" class="min-w-0 flex-1 bg-white px-6 py-3.5 text-ink placeholder:text-muted/80 focus:outline-none focus:ring-1 focus:ring-brand">
         <button type="submit" class="flex w-20 shrink-0 items-center justify-center bg-ink text-white transition hover:bg-brand" aria-label="Subscribe">${icon('arrowRight', 'h-5 w-5')}</button>

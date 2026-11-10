@@ -1,5 +1,5 @@
 // One function per page type. Each returns { meta, body } which build.mjs wraps in the layout.
-import { esc, icon, money, productImg, bannerImg, IMG, formatDate, anyImg, strip, imgUrl } from './helpers.mjs';
+import { esc, icon, money, productImg, bannerImg, IMG, formatDate, anyImg, strip, imgUrl, honeypot } from './helpers.mjs';
 import { productCard, pageTitle, breadcrumbs, price, productUrl, blogCard, priceOf } from './components.mjs';
 
 const HOME = { label: 'Home', href: '/' };
@@ -303,6 +303,7 @@ export function contact(ctx) {
       ${s.address ? `<li class="inline-flex items-center gap-2">${icon('pin', 'h-5 w-5 text-brand')}${esc(s.address)}</li>` : ''}
     </ul>
     <form class="mt-8 space-y-5" data-form="contact" novalidate>
+      ${honeypot}
       <div><label for="c-name" class="sr-only">Name</label><input id="c-name" name="name" required autocomplete="name" placeholder="Name*" class="field"></div>
       <div><label for="c-email" class="sr-only">Email</label><input id="c-email" name="email" type="email" required autocomplete="email" placeholder="Email*" class="field"></div>
       <div><label for="c-msg" class="sr-only">Your message</label><textarea id="c-msg" name="message" rows="6" required placeholder="Your Message" class="field resize-y"></textarea></div>
@@ -356,6 +357,7 @@ export function checkout(ctx) {
 <section class="container-site pb-8 lg:px-10" data-checkout-page>
   <div data-checkout-empty hidden class="rounded-md bg-[#F8F8F8] px-8 py-6">Your cart is currently empty. <a href="/shop/" class="font-medium text-brand underline">Return to shop</a></div>
   <form class="grid gap-10 lg:grid-cols-[1fr_420px]" data-checkout-form novalidate>
+    ${honeypot}
     <div>
       <h2 class="mb-6 text-2xl font-medium">Billing &amp; shipping details</h2>
       <div class="grid gap-5 sm:grid-cols-2">
@@ -403,64 +405,9 @@ export function wishlist() {
   return { meta: { title: 'Wishlist', noindex: true }, body };
 }
 
-/* ------------------------------------------------------------------ LOGIN / ACCOUNT */
-export function login() {
-  const body = `${pageTitle('Login', [HOME, { label: 'Login' }], { banner: false })}
-<section class="mx-auto max-w-md px-4 pb-8 sm:px-6" data-login-page>
-  <div class="rounded-lg bg-soft p-6 sm:p-10">
-    <h2 class="text-2xl font-medium">Sign in with your mobile</h2>
-    <p class="mt-2 text-sm">We’ll send a one-time code by SMS. No password needed.</p>
-
-    <div data-auth-unconfigured hidden class="mt-6 rounded-md border-l-4 border-brand bg-white p-4 text-sm text-ink">Login is being set up and will be available soon.</div>
-
-    <form class="mt-8" data-phone-form novalidate>
-      <label for="login-phone" class="field-label">Mobile number</label>
-      <div class="flex overflow-hidden rounded-md bg-white focus-within:ring-1 focus-within:ring-brand">
-        <span class="flex items-center border-r border-line px-4 text-ink" aria-hidden="true">+91</span>
-        <input id="login-phone" name="phone" type="tel" inputmode="numeric" autocomplete="tel-national" maxlength="17" required placeholder="98765 43210" class="min-w-0 flex-1 px-4 py-3.5 text-ink placeholder:text-muted/70 focus:outline-none">
-      </div>
-      <button type="submit" class="btn-brand mt-5 w-full py-4">Send code</button>
-    </form>
-
-    <form class="mt-8" data-otp-form hidden novalidate>
-      <p class="text-sm">Code sent to <span class="font-medium text-ink" data-phone-display></span> · <button type="button" class="text-brand underline underline-offset-2" data-change-number>Change</button></p>
-      <label for="login-code" class="field-label mt-5">6-digit code</label>
-      <input id="login-code" name="code" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required placeholder="••••••" class="field text-center text-2xl tracking-[0.6em]">
-      <button type="submit" class="btn-brand mt-5 w-full py-4">Verify &amp; sign in</button>
-      <button type="button" class="mt-4 w-full text-sm text-ink underline-offset-2 hover:underline disabled:text-muted disabled:no-underline" data-resend disabled>Resend code</button>
-    </form>
-
-    <p class="mt-4 min-h-[1.5rem] text-sm" data-auth-status role="status" aria-live="polite"></p>
-    <div data-recaptcha></div>
-    <p class="mt-6 text-xs leading-relaxed">By continuing you agree to our <a href="/privacy-policy/" class="text-brand underline">privacy policy</a>. This site is protected by reCAPTCHA and the Google <a href="https://policies.google.com/privacy" target="_blank" rel="noopener" class="underline">Privacy Policy</a> and <a href="https://policies.google.com/terms" target="_blank" rel="noopener" class="underline">Terms of Service</a> apply.</p>
-  </div>
-</section>`;
-  return { meta: { title: 'Login', noindex: true, scripts: ['auth.js'] }, body };
-}
-
-export function account() {
-  const row = (label, attr) => `<div class="flex justify-between gap-4 py-4"><dt>${label}</dt><dd class="text-right font-medium text-ink" ${attr}></dd></div>`;
-  const body = `${pageTitle('My account', [HOME, { label: 'My account' }], { banner: false })}
-<section class="mx-auto max-w-xl px-4 pb-8 sm:px-6" data-account-page>
-  <p class="py-10 text-center" data-account-loading>Loading your account…</p>
-  <div hidden data-account-body>
-    <div class="rounded-lg bg-soft p-6 sm:p-10">
-      <h2 class="text-2xl font-medium">Your details</h2>
-      <dl class="mt-4 divide-y divide-line">
-        ${row('Mobile number', 'data-account-phone')}
-        ${row('Member since', 'data-account-since')}
-        ${row('Last sign-in', 'data-account-last')}
-      </dl>
-    </div>
-    <div class="mt-6 grid gap-3 sm:grid-cols-3">
-      <a href="/wishlist/" class="btn-outline px-4">Wishlist</a>
-      <a href="/cart/" class="btn-outline px-4">Cart</a>
-      <button type="button" class="btn-dark px-4" data-sign-out>Sign out</button>
-    </div>
-  </div>
-</section>`;
-  return { meta: { title: 'My account', noindex: true, scripts: ['auth.js'] }, body };
-}
+/* ------------------------------------------------------------------ LOGIN / REGISTER / ACCOUNT */
+// Defined in auth-pages.mjs
+export { login, register, account } from './auth-pages.mjs';
 
 /* ------------------------------------------------------------------ POLICY / 404 */
 export function policy(ctx, key) {

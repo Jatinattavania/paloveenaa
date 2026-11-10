@@ -4,6 +4,13 @@ import { cart, wishlist, onChange, cartSummary, findProduct, getCatalog, money, 
 import { renderMiniCart, renderCartPage, renderCheckoutSummary, renderWishlistPage, renderQuickView, updateBadges, esc } from './ui.js';
 import { send, formData, validate, hasService, mailtoUrl } from './forms.js';
 
+// Clickjacking guard: refuse to be shown inside another site's frame. (On Hostinger the .htaccess headers
+// already block this; GitHub Pages can't send those headers, so this covers it.)
+if (window.top !== window.self) {
+  document.documentElement.style.display = 'none';
+  try { window.top.location.replace(window.self.location.href); } catch { /* browser blocked it – page stays hidden */ }
+}
+
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 
@@ -247,6 +254,9 @@ const status = (form, msg, ok = true) => {
   }
 };
 
+// The hidden "botcheck" box is only ever ticked by spam bots: pretend it worked and send nothing.
+const isBot = (form) => Boolean(form.botcheck?.checked);
+
 const REMEMBER_KEY = 'pv-contact';
 function initContactRemember() {
   const form = $('[data-form="contact"]');
@@ -263,6 +273,7 @@ function initContactRemember() {
 
 async function submitContact(e, form) {
   e.preventDefault();
+  if (isBot(form)) return status(form, 'Thank you! Your message has been sent.');
   if (!validate(form)) return;
   const d = formData(form);
   try {
@@ -282,6 +293,7 @@ async function submitContact(e, form) {
 
 async function submitNewsletter(e, form) {
   e.preventDefault();
+  if (isBot(form)) return status(form, 'Thank you for subscribing!');
   if (!validate(form)) return;
   const email = form.email.value.trim();
   const res = await send(`Newsletter sign-up – ${config.siteName}`, { email }, `Please add ${email} to the ${config.siteName} newsletter.`);
@@ -294,7 +306,7 @@ async function submitNewsletter(e, form) {
 const ORDER_KEY = 'pv-last-order';
 
 function orderText(o) {
-  const lines = o.items.map((l) => `• ${l.name} × ${l.qty} – ${money(l.lineTotal)}`).join('\n');
+  const lines = o.items.map((l) => `• ${l.name} (product #${l.id}) — ${l.qty} × ${money(l.price)} = ${money(l.lineTotal)}`).join('\n');
   const c = o.customer;
   return `New order ${o.number} (${o.date})
 
@@ -314,11 +326,16 @@ SHIPPING ADDRESS
 ${c.address}
 ${c.city}, ${c.state} ${c.pincode}
 ${c.country}
-${c.notes ? `\nNOTES\n${c.notes}` : ''}`;
+${c.notes ? `\nNOTES\n${c.notes}` : ''}
+
+---
+SHOP NOTE: totals are calculated in the customer's browser. Before confirming, check each product's
+price against your current price list (product # = ID in src/data/products.json).`;
 }
 
 async function submitOrder(e, form) {
   e.preventDefault();
+  if (isBot(form)) return status(form, 'Thank you! Your order has been received.');
   if (!validate(form)) return;
   const s = await cartSummary();
   if (!s.lines.length) return status(form, 'Your cart is empty.', false);
@@ -329,6 +346,7 @@ async function submitOrder(e, form) {
   const number = `PV-${now.toISOString().slice(2, 10).replace(/-/g, '')}-${Math.floor(1000 + Math.random() * 9000)}`;
   const customer = formData(form);
   delete customer.terms;
+  delete customer.botcheck;
   const order = {
     number,
     date: now.toLocaleString('en-IN'),
@@ -375,7 +393,7 @@ function renderOrderReceived() {
     <div><dt class="uppercase tracking-[0.12em]">Total</dt><dd class="mt-1 text-lg font-medium text-ink">${money(o.total)}</dd></div>
   </dl>
   <h2 class="mb-4 mt-10 text-2xl font-medium">Order details</h2>
-  <ul class="divide-y divide-line border-y border-line">${o.items.map((l) => `<li class="flex justify-between py-3"><span class="text-ink">${esc(l.name)} × ${l.qty}</span><span class="text-ink">${money(l.lineTotal)}</span></li>`).join('')}</ul>
+  <ul class="divide-y divide-line border-y border-line">${o.items.map((l) => `<li class="flex justify-between py-3"><span class="text-ink">${esc(l.name)} × ${Number(l.qty) || 0}</span><span class="text-ink">${money(l.lineTotal)}</span></li>`).join('')}</ul>
   <a href="${link('/shop/')}" class="btn-outline mt-10">Continue shopping</a>`;
   if (mail && !sessionStorage.getItem(ORDER_KEY + '-opened')) {
     sessionStorage.setItem(ORDER_KEY + '-opened', '1');

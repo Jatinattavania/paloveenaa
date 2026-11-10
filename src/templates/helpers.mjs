@@ -12,6 +12,9 @@ export const strip = (html = '') => html.replace(/<[^>]+>/g, ' ').replace(/\s+/g
 
 export const IMG = '/assets/images';
 
+// Hidden spam trap: people never see or tick it, bots usually do. (Also understood by Web3Forms.)
+export const honeypot = '<input type="checkbox" name="botcheck" tabindex="-1" autocomplete="off" aria-hidden="true" class="hidden">';
+
 // Responsive <img> for product photos (3:4 portrait, generated at 400/800/1200px).
 export function productImg(name, { alt = '', sizes = '(min-width: 1024px) 25vw, 50vw', eager = false, cls = '' } = {}) {
   const b = `${IMG}/products/${name}`;

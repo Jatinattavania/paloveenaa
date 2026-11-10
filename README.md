@@ -44,16 +44,21 @@ Static hosting has no server to receive orders, so these are sent in one of two 
 
 No payment is taken on the website. Checkout tells the customer you will contact them to confirm the order and arrange payment. (The WordPress shop had no payment method enabled either.) To take online payments later, Razorpay Payment Links or Shopify Buy Buttons can be added.
 
-## Login with mobile number (OTP)
+## Customer accounts (email & password + mobile OTP)
 
-Pages: `/login/` and `/account/` (the person icon in the header). Customers enter their Indian mobile number, receive a 6-digit SMS code and are signed in. There are no passwords.
+Pages: `/register/` (create account), `/login/` and `/account/` (the person icon in the header).
 
-This uses **Firebase Authentication** (Google). Firebase generates, sends and verifies the codes on its servers, and manages the sessions. Until it's configured, the login page shows "Login is being set up".
+- **Create account:** first name, last name, email, mobile, password and re-entered password. The password needs 8+ characters with upper- and lower-case letters and a number. A verification email is sent. The customer then confirms their mobile with an SMS code, which links it to the same account. They can skip this and do it later from *My account*.
+- **Sign in:** two tabs, **Email & password** (with "Forgot password?") or **Mobile OTP**. Both open the same account once the mobile is verified.
+
+This uses **Firebase Authentication** (Google). Passwords are hashed and checked only on Firebase's servers. SMS codes are generated and verified there too, and Firebase manages the sessions. Until it's configured, the pages show "Login is being set up".
 
 ### One-time setup (about 15 minutes)
 
 1. Go to https://console.firebase.google.com, create a project (e.g. "paloveenaa"), and switch it to the **Blaze (pay-as-you-go)** plan. Phone sign-in needs billing, and each SMS is charged (check current India pricing in the console).
-2. **Authentication → Sign-in method → Phone → Enable.**
+2. **Authentication → Sign-in method:** enable **Email/Password** (leave "Email link" off) and **Phone**.
+   - Under **Authentication → Settings → User actions**, keep **Email enumeration protection** ON.
+   - Under **Password policy**, require upper case, lower case, a number and a minimum length of 8, to match the site.
 3. **Authentication → Settings → SMS region policy → Allow** only **India**. This blocks "SMS pumping" fraud, where bots trigger expensive international SMS.
 4. **Authentication → Settings → Authorized domains:** add `paloveenaa.com` and `www.paloveenaa.com`. `localhost` is there for testing.
 5. **Project settings → Your apps → Add app → Web.** Copy `apiKey`, `authDomain`, `projectId` and `appId` into `src/data/settings.json` → `firebase`, then run `npm run build`. These are public identifiers, not passwords.
@@ -68,6 +73,9 @@ This uses **Firebase Authentication** (Google). Firebase generates, sends and ve
 | Risk | Protection |
 |---|---|
 | Guessing or forging codes | Codes are created and checked only on Firebase's servers. The website never sees the correct code. |
+| Password theft / guessing | Passwords are hashed by Firebase and never stored by the site. Strong-password rules apply. Firebase blocks repeated failed attempts. The password field is cleared after a failure. |
+| Discovering who has an account | Wrong email and wrong password give the same message, and "Forgot password?" always gives the same reply. |
+| One mobile on two accounts | A mobile already verified on another account is refused when linking. |
 | Bots / SMS spam | Invisible reCAPTCHA must pass before any SMS is sent. Firebase rate-limits each number and device. The site adds a 30-second resend cooldown and a cap of 5 code attempts. SMS is limited to India (step 3). |
 | Stolen sessions via injected scripts (XSS) | A strict Content-Security-Policy only allows scripts from this site and Google's reCAPTCHA. Account data is shown with `textContent`, never as HTML. The Firebase SDK is self-hosted, not loaded from a third-party CDN. |
 | Open redirects / phishing links | `?next=` after login only accepts paths on this site. |
