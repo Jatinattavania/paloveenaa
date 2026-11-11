@@ -1,0 +1,136 @@
+rules_version = '2';
+// Firestore security rules for Paloveenaa – the real lock on all customer / order data.
+// TEMPLATE: the owner and staff email lists are filled from src/data/admins.json by `npm run rules`
+// (output: firebase/firestore.rules, kept out of git so admin emails stay private).
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ------------------------------------------------------------------ who is who
+    function signedIn() { return request.auth != null; }
+    function verifiedEmail() {
+      return signedIn() && request.auth.token.get('email_verified', false) == true && request.auth.token.get('email', '') != '';
+    }
+    function isOwner() { return verifiedEmail() && request.auth.token.email.lower() in __OWNERS__; }
+    function isStaff() { return isOwner() || (verifiedEmail() && request.auth.token.email.lower() in __STAFF__); }
+
+    // Role probes: the admin panel reads these to learn the signed-in person's role.
+    // Nothing is stored here and no emails are revealed – the read simply succeeds or is refused.
+    match /_access/owner { allow get: if isOwner(); }
+    match /_access/staff { allow get: if isStaff(); }
+
+    function db(path) { return /databases/$(database)/documents/$(path); }
+    function validName(n) { return n is string && n.size() > 0 && n.size() <= 50; }
+    function validPhone(p) { return p is string && p.matches('^[+]91[6-9][0-9]{9}$'); }
+    // History times come from the device clock (the server time is in createdAt/updatedAt); allow a day
+    // of clock difference so a customer whose phone clock is wrong can still order.
+    function nearNow(t) { return t is timestamp && t > request.time - duration.value(1, 'd') && t < request.time + duration.value(1, 'd'); }
+
+    // ------------------------------------------------------------------ one account per mobile number
+    // phones/{+91…} = which account owns a number (create-once: a second account can't take it).
+    // phoneOwners/{uid} = the number an account owns (so one account can't reserve many numbers).
+    // Both are written together in one batch.
+    match /phones/{phone} {
+      allow create: if signedIn() && validPhone(phone)
+        && request.resource.data.keys().hasOnly(['uid', 'createdAt'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.createdAt == request.time
+        && !exists(db(/phoneOwners/$(request.auth.uid)))
+        && getAfter(db(/phoneOwners/$(request.auth.uid))).data.phone == phone;
+      allow get: if isStaff() || (signedIn() && resource.data.uid == request.auth.uid);
+      allow list, update: if false;
+      allow delete: if isOwner();
+    }
+    match /phoneOwners/{uid} {
+      allow create: if signedIn() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['phone'])
+        && validPhone(request.resource.data.phone)
+        && getAfter(db(/phones/$(request.resource.data.phone))).data.uid == uid;
+      allow get: if isStaff() || (signedIn() && request.auth.uid == uid);
+      allow list, update: if false;
+      allow delete: if isOwner();
+    }
+
+    // ------------------------------------------------------------------ customer profiles
+    match /users/{uid} {
+      allow get: if isStaff() || (signedIn() && request.auth.uid == uid);
+      allow list: if isStaff();
+      allow create: if signedIn() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['firstName', 'lastName', 'email', 'phone', 'phoneVerified', 'createdAt'])
+        && validName(request.resource.data.firstName) && validName(request.resource.data.lastName)
+        && request.resource.data.email == request.auth.token.get('email', '')
+        && validPhone(request.resource.data.phone)
+        && get(db(/phoneOwners/$(uid))).data.phone == request.resource.data.phone
+        && request.resource.data.phoneVerified == (request.auth.token.get('phone_number', '') == request.resource.data.phone)
+        && request.resource.data.createdAt == request.time;
+      allow update: if signedIn() && request.auth.uid == uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['firstName', 'lastName'])
+        && validName(request.resource.data.firstName) && validName(request.resource.data.lastName);
+      allow delete: if false;
+    }
+
+    // ------------------------------------------------------------------ orders
+    // Status flow: new → confirmed → packed → shipped → delivered; cancelled from new/confirmed/packed.
+    function allowedMove(from, to) {
+      return (from == 'new' && to in ['confirmed', 'cancelled'])
+        || (from == 'confirmed' && to in ['packed', 'cancelled'])
+        || (from == 'packed' && to in ['shipped', 'cancelled'])
+        || (from == 'shipped' && to == 'delivered');
+    }
+    function onlyChanges(keys) { return request.resource.data.diff(resource.data).affectedKeys().hasOnly(keys); }
+    // history may only grow by exactly one entry describing this change; earlier entries can't be edited.
+    function appendsHistory(status, by) {
+      let n = resource.data.history.size();
+      let h = request.resource.data.history;
+      return h is list && h.size() == n + 1 && h[0:n] == resource.data.history
+        && h[n].keys().hasOnly(['status', 'at', 'by']) && h[n].status == status && h[n].by == by && nearNow(h[n].at);
+    }
+    function shortText(v, max) { return v is string && v.size() <= max; }
+
+    match /orders/{orderId} {
+      allow read: if isStaff() || (signedIn() && resource.data.uid == request.auth.uid);
+
+      // Customer places an order (cash on delivery for now). Prices can't be re-checked here on the
+      // free plan, so the admin panel flags any order whose prices differ from the current price list.
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['number', 'uid', 'customer', 'items', 'subtotal', 'discount', 'coupon', 'shipping', 'total', 'paymentMethod', 'status', 'history', 'createdAt', 'updatedAt'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.status == 'new'
+        && request.resource.data.paymentMethod == 'cod'
+        && shortText(request.resource.data.number, 30)
+        && request.resource.data.customer is map
+        && request.resource.data.items is list && request.resource.data.items.size() > 0 && request.resource.data.items.size() <= 30
+        && request.resource.data.subtotal is number && request.resource.data.subtotal >= 0
+        && request.resource.data.discount is number && request.resource.data.discount >= 0
+        && request.resource.data.shipping is number && request.resource.data.shipping >= 0
+        && request.resource.data.total is number && request.resource.data.total >= 0
+        && request.resource.data.history is list && request.resource.data.history.size() == 1
+        && request.resource.data.history[0].status == 'new' && request.resource.data.history[0].by == 'customer' && nearNow(request.resource.data.history[0].at)
+        && request.resource.data.createdAt == request.time && request.resource.data.updatedAt == request.time;
+
+      allow update: if request.resource.data.updatedAt == request.time && (
+        // Customer cancels their own order before it is packed.
+        (signedIn() && resource.data.uid == request.auth.uid
+          && resource.data.status in ['new', 'confirmed']
+          && request.resource.data.status == 'cancelled'
+          && onlyChanges(['status', 'history', 'cancelReason', 'updatedAt'])
+          && shortText(request.resource.data.cancelReason, 300)
+          && appendsHistory('cancelled', 'customer'))
+        ||
+        // Staff / owner: move the order along, add courier + tracking, internal note.
+        (isStaff()
+          && onlyChanges(['status', 'history', 'courier', 'trackingNumber', 'adminNote', 'cancelReason', 'updatedAt'])
+          && shortText(request.resource.data.get('courier', ''), 60)
+          && shortText(request.resource.data.get('trackingNumber', ''), 60)
+          && shortText(request.resource.data.get('adminNote', ''), 1000)
+          && shortText(request.resource.data.get('cancelReason', ''), 300)
+          && ((request.resource.data.status == resource.data.status && request.resource.data.history == resource.data.history)
+            || (allowedMove(resource.data.status, request.resource.data.status)
+              && appendsHistory(request.resource.data.status, request.auth.token.email.lower()))))
+      );
+      allow delete: if false;
+    }
+
+    // Everything else: closed.
+    match /{document=**} { allow read, write: if false; }
+  }
+}

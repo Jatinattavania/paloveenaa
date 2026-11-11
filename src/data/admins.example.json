@@ -1,0 +1,5 @@
+{
+  "_help": "Copy to admins.json (private, not uploaded to GitHub) and put the real emails in. Owners can do everything; staff can manage orders but not money/settings. After editing, run: npm run deploy:rules",
+  "owners": ["owner@example.com"],
+  "staff": ["staff@example.com"]
+}

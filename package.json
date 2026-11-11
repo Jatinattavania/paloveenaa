@@ -10,7 +10,9 @@
     "build:css": "tailwindcss -i src/styles/input.css -o website/assets/css/styles.css --minify",
     "build": "npm run build:html && npm run build:css",
     "watch:css": "tailwindcss -i src/styles/input.css -o website/assets/css/styles.css --watch",
-    "start": "http-server website -p 8080 -c-1"
+    "start": "http-server website -p 8080 -c-1",
+    "rules": "node src/rules.mjs",
+    "deploy:rules": "node src/rules.mjs && firebase deploy --only firestore:rules"
   },
   "devDependencies": {
     "firebase": "13.1.0",

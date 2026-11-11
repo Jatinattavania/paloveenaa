@@ -9,6 +9,12 @@ coming-soon/
 # Local secrets, if ever added
 .env
 .env.*
+# Admin / staff emails and the security rules generated from them (kept private)
+src/data/admins.json
+firebase/firestore.rules
+.firebase/
+firebase-debug.log
+firestore-debug.log
 
 # --- Tools ---------------------------------------------------------------
 node_modules/

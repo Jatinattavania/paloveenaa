@@ -1,6 +1,6 @@
 // One function per page type. Each returns { meta, body } which build.mjs wraps in the layout.
 import { esc, icon, money, productImg, bannerImg, IMG, formatDate, anyImg, strip, imgUrl, honeypot } from './helpers.mjs';
-import { productCard, pageTitle, breadcrumbs, price, productUrl, blogCard, priceOf } from './components.mjs';
+import { productCard, pageTitle, breadcrumbs, price, productUrl, blogCard, priceOf, sizePicker } from './components.mjs';
 
 const HOME = { label: 'Home', href: '/' };
 
@@ -174,7 +174,9 @@ export function product(ctx, p) {
     <div class="mt-5">${price(p, 'lg')}</div>
     ${p.shortDescription ? `<div class="prose-content mt-6">${p.shortDescription}</div>` : ''}
     <p class="mt-4 flex items-center gap-2 text-sm ${p.inStock ? 'text-green-700' : 'text-red-700'}">${icon(p.inStock ? 'check' : 'close', 'h-4 w-4')}${p.inStock ? 'In stock' : 'Out of stock'}</p>
-    <form class="mt-8 space-y-4" data-product-form="${p.id}">
+    <form class="mt-8 space-y-4" data-product-form="${p.id}" novalidate>
+      ${sizePicker(p, `p${p.id}`)}
+      <p class="pt-2 text-sm font-medium text-ink">Quantity</p>
       <div class="inline-flex items-center rounded-md border-2 border-brand" data-qty>
         <button type="button" class="flex h-11 w-11 items-center justify-center text-muted hover:text-brand" data-qty-dec aria-label="Decrease quantity">${icon('minus', 'h-4 w-4')}</button>
         <label class="sr-only" for="qty-${p.id}">Quantity</label>
@@ -354,9 +356,14 @@ export function checkout(ctx) {
   const f = (id, label, attrs = '', full = false) =>
     `<div class="${full ? 'sm:col-span-2' : ''}"><label for="co-${id}" class="field-label">${label}</label><input id="co-${id}" name="${id}" class="field !py-3" ${attrs}></div>`;
   const body = `${pageTitle('Checkout', [HOME, { label: 'Cart', href: '/cart/' }, { label: 'Checkout' }], { banner: false })}
-<section class="container-site pb-8 lg:px-10" data-checkout-page>
+<section class="container-site pb-8 lg:px-10" data-checkout-page data-needs-signin="1">
   <div data-checkout-empty hidden class="rounded-md bg-[#F8F8F8] px-8 py-6">Your cart is currently empty. <a href="/shop/" class="font-medium text-brand underline">Return to shop</a></div>
-  <form class="grid gap-10 lg:grid-cols-[1fr_420px]" data-checkout-form novalidate>
+  <div data-checkout-signin hidden class="mx-auto max-w-md rounded-lg bg-soft p-6 text-center sm:p-10">
+    <h2 class="text-2xl font-medium">Sign in to place your order</h2>
+    <p class="mt-2 text-sm">Your cart is saved. Sign in or create an account so you can track your order and see its status any time.</p>
+    <div class="mt-6 grid gap-3"><a href="/login/?next=/checkout/" class="btn-brand">Sign in</a><a href="/register/?next=/checkout/" class="btn-outline">Create an account</a></div>
+  </div>
+  <form class="grid gap-10 lg:grid-cols-[1fr_420px]" data-checkout-form novalidate hidden>
     ${honeypot}
     <div>
       <h2 class="mb-6 text-2xl font-medium">Billing &amp; shipping details</h2>
@@ -377,8 +384,8 @@ export function checkout(ctx) {
       <h2 class="mb-6 text-2xl font-medium">Your order</h2>
       <div data-checkout-summary></div>
       <div class="mt-6 rounded-md bg-white p-4 text-sm leading-relaxed">
-        <p class="font-medium text-ink">How payment works</p>
-        <p class="mt-1">No payment is taken on the website. After you place your order we will contact you on your phone/email to confirm it and share payment options.</p>
+        <p class="font-medium text-ink">Payment: Cash on delivery</p>
+        <p class="mt-1">Pay when your order arrives. We’ll confirm your order by phone or email before it ships. Online payment is coming soon.</p>
       </div>
       <label class="mt-5 flex items-start gap-3 text-sm"><input type="checkbox" required name="terms" class="mt-1 h-4 w-4 accent-brand"> <span>I have read and agree to the <a href="/privacy-policy/" class="text-brand underline">privacy policy</a> and <a href="/refund-returns/" class="text-brand underline">refund &amp; returns policy</a>.</span></label>
       <button type="submit" class="btn-brand mt-6 w-full py-4">Place order</button>
@@ -386,7 +393,7 @@ export function checkout(ctx) {
     </aside>
   </form>
 </section>`;
-  return { meta: { title: 'Checkout', noindex: true }, body };
+  return { meta: { title: 'Checkout', noindex: true, scripts: ['orders.js'] }, body };
 }
 
 export function orderReceived() {
@@ -394,7 +401,7 @@ export function orderReceived() {
 <section class="mx-auto max-w-3xl px-4 pb-8 sm:px-6" data-order-received>
   <p class="py-10 text-center">Loading…</p>
 </section>`;
-  return { meta: { title: 'Order received', noindex: true }, body };
+  return { meta: { title: 'Order received', noindex: true, scripts: ['orders.js'] }, body };
 }
 
 export function wishlist() {
@@ -407,7 +414,8 @@ export function wishlist() {
 
 /* ------------------------------------------------------------------ LOGIN / REGISTER / ACCOUNT */
 // Defined in auth-pages.mjs
-export { login, register, account } from './auth-pages.mjs';
+export { login, register, account, authAction } from './auth-pages.mjs';
+export { admin } from './admin-page.mjs';
 
 /* ------------------------------------------------------------------ POLICY / 404 */
 export function policy(ctx, key) {

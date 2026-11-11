@@ -10,11 +10,13 @@
 //     so attackers can't use the site to discover customers' emails.
 //   - Sessions are short-lived tokens (1 hour) refreshed by Firebase. Nothing sensitive is stored by us.
 //   - Everything from the account is shown with textContent (never as HTML).
-import config from './config.js';
-import { initializeApp } from '../vendor/firebase-13.1.0/firebase-app.js';
+import { auth, configured, link, fbConfig } from './fb.js';
+import { db, doc, getDoc, writeBatch, setDoc, serverTimestamp, loadProfile } from './db.js';
 import {
-  getAuth, connectAuthEmulator, RecaptchaVerifier, signInWithPhoneNumber, linkWithPhoneNumber, onAuthStateChanged, signOut,
+  RecaptchaVerifier, signInWithPhoneNumber, linkWithPhoneNumber, onAuthStateChanged, signOut,
   createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, sendEmailVerification, sendPasswordResetEmail, reload,
+  getAdditionalUserInfo, linkWithCredential, EmailAuthProvider,
+  applyActionCode, checkActionCode, verifyPasswordResetCode, confirmPasswordReset,
 } from '../vendor/firebase-13.1.0/firebase-auth.js';
 
 // Never run the sign-in UI inside someone else's frame (clickjacking). app.js also hides the page.
@@ -22,9 +24,8 @@ if (window.top !== window.self) throw new Error('Refusing to run inside a frame'
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
-const link = (p) => (config.base || '') + p; // adds the sub-folder on GitHub Pages
-const fb = config.firebase || {};
-const configured = Boolean(fb.apiKey && fb.authDomain && fb.projectId && fb.appId);
+// true (Blaze plan): new accounts verify their mobile by SMS. false (free plan): mobile saved without SMS.
+const REQUIRE_SMS = fbConfig.requirePhoneVerification === true;
 
 const RESEND_SECONDS = 30;
 const MAX_CODE_ATTEMPTS = 5;
@@ -91,6 +92,9 @@ const MESSAGES = {
   'auth/account-exists-with-different-credential': 'This mobile number is already used by another account. Sign in with “Mobile OTP” instead.',
   'auth/provider-already-linked': 'A mobile number is already verified on this account.',
   'auth/requires-recent-login': 'For your security, please sign out and sign in again, then try once more.',
+  // Our own checks
+  'paloveena/phone-registered': 'This mobile number is already registered with an account. Please sign in instead.',
+  'paloveena/no-account': 'No account is registered with this mobile number. Please create an account first.',
 };
 const message = (err) => MESSAGES[err?.code] || 'Something went wrong. Please try again.';
 
@@ -117,18 +121,28 @@ function disableAll(root) {
   $$('input, button', root).forEach((el) => (el.disabled = true));
 }
 
-/* ------------------------------------------------------------------ Firebase */
-let auth = null;
-if (configured) {
-  const app = initializeApp({ apiKey: fb.apiKey, authDomain: fb.authDomain, projectId: fb.projectId, appId: fb.appId });
-  auth = getAuth(app);
-  auth.useDeviceLanguage();
-  // Local testing only: talks to the Firebase Auth emulator instead of real Firebase.
-  if (fb.emulator && ['localhost', '127.0.0.1'].includes(location.hostname)) {
-    connectAuthEmulator(auth, /^https?:\/\//.test(fb.emulator) ? fb.emulator : `http://${fb.emulator}`, { disableWarnings: true });
+/* ------------------------------------------------------------------ customer profile (Firestore) */
+/**
+ * Saves the profile and claims the mobile number for this account. The database refuses a number that
+ * another account already has (security rules), which is how "one account per mobile" works without SMS.
+ * @returns {Promise<'ok'|'phone-taken'>}
+ */
+async function saveProfile(user, { firstName, lastName, phone }) {
+  const batch = writeBatch(db);
+  batch.set(doc(db, 'phones', phone), { uid: user.uid, createdAt: serverTimestamp() });
+  batch.set(doc(db, 'phoneOwners', user.uid), { phone });
+  try {
+    await batch.commit();
+  } catch (err) {
+    if (err?.code === 'permission-denied') return 'phone-taken';
+    throw err;
   }
-  // Session persistence: Firebase's default (IndexedDB) – kept signed in on this device until "Sign out".
+  await setDoc(doc(db, 'users', user.uid), {
+    firstName, lastName, email: user.email, phone, phoneVerified: user.phoneNumber === phone, createdAt: serverTimestamp(),
+  });
+  return 'ok';
 }
+
 
 /* ------------------------------------------------------------------ shared UI */
 
@@ -242,6 +256,12 @@ function otpFlow(block, { start, done, phone: initialPhone = '' }) {
       clearInterval(timer);
       await done(cred);
     } catch (err) {
+      if (err?.resetFlow) {
+        // The code was right but the result isn't allowed (e.g. number already registered): start over.
+        reset();
+        setStatus(status, message(err));
+        return;
+      }
       attempts++;
       setStatus(status, message(err));
       if (['auth/code-expired', 'auth/session-expired'].includes(err?.code) || attempts >= MAX_CODE_ATTEMPTS) confirmation = null;
@@ -253,17 +273,38 @@ function otpFlow(block, { start, done, phone: initialPhone = '' }) {
 
   resendBtn.addEventListener('click', () => phone && send());
 
-  $('[data-change-number]', block).addEventListener('click', () => {
+  function reset(newPhone) {
     confirmation = null;
     clearInterval(timer);
     otpForm.hidden = true;
     phoneForm.hidden = false;
     setStatus(status, '');
+    if (newPhone !== undefined) phoneForm.phone.value = newPhone.replace(/^\+91/, '');
+  }
+
+  $('[data-change-number]', block).addEventListener('click', () => {
+    reset();
     phoneForm.phone.focus();
   });
 
-  return { status };
+  return { status, reset };
 }
+
+/**
+ * Send verification / reset emails with a "Continue" link back to this site. If Firebase doesn't accept
+ * this site's address as a continue link (domain not authorised yet), send the email without it.
+ */
+async function withContinueUrl(send, path) {
+  try {
+    await send({ url: location.origin + link(path) });
+  } catch (err) {
+    if (['auth/unauthorized-continue-uri', 'auth/invalid-continue-uri', 'auth/missing-continue-uri'].includes(err?.code)) await send(undefined);
+    else throw err;
+  }
+}
+
+/** Error that sends an OTP flow back to the phone step with a message. */
+const restart = (code) => Object.assign(new Error(code), { code, resetFlow: true });
 
 /* ------------------------------------------------------------------ login page */
 function initLogin(root) {
@@ -271,7 +312,12 @@ function initLogin(root) {
 
   let leaving = false;
   const go = () => { if (!leaving) { leaving = true; location.replace(safeNext()); } };
-  onAuthStateChanged(auth, (user) => user && go()); // already signed in → straight on
+  // Already signed in when the page opens → straight on. (Only the first check: later sign-ins are
+  // handled below, after we've confirmed the account is allowed.)
+  const stopWatching = onAuthStateChanged(auth, (user) => {
+    stopWatching();
+    if (user) go();
+  });
 
   // Tabs (arrow keys supported)
   const tabs = $$('[data-tab]', root);
@@ -325,7 +371,7 @@ function initLogin(root) {
     }
     e.target.disabled = true;
     try {
-      await sendPasswordResetEmail(auth, email);
+      await withContinueUrl((s) => sendPasswordResetEmail(auth, email, s), '/login/');
       setStatus(status, 'If an account exists for this email, we’ve sent a link to reset your password.', true);
     } catch (err) {
       if (['auth/user-not-found', 'auth/invalid-credential'].includes(err?.code)) {
@@ -336,25 +382,41 @@ function initLogin(root) {
     }
   });
 
-  // Mobile OTP
+  // Mobile OTP – only for numbers that belong to a registered account. Firebase would otherwise quietly
+  // create a new, empty account for an unknown number, so we remove it again and point to sign-up.
   otpFlow($('[data-panel="phone"] [data-otp-block]', root), {
     start: (phone, verifier) => signInWithPhoneNumber(auth, phone, verifier),
-    done: async () => go(),
+    done: async (cred) => {
+      if (getAdditionalUserInfo(cred)?.isNewUser) {
+        await cred.user.delete().catch(() => signOut(auth));
+        throw restart('paloveena/no-account');
+      }
+      go();
+    },
   });
 }
 
 /* ------------------------------------------------------------------ register page */
+// Order of events (so duplicates are impossible and no half-made accounts are left behind):
+//   1. Customer fills in details – "Create account" stays disabled until everything is valid.
+//   2. Mobile verified by SMS code. If that number already belongs to an account → refused (sign in instead).
+//   3. Email + password attached to the new account. If the email is already used → the new account is
+//      deleted again and the customer is told. Then name saved and a verification email sent.
 function initRegister(root) {
   if (!configured) return disableAll(root);
 
   let registering = false;
-  onAuthStateChanged(auth, (user) => {
+  const stopWatching = onAuthStateChanged(auth, (user) => {
+    stopWatching();
     if (user && !registering) location.replace(safeNext()); // already signed in
   });
 
   const form = $('[data-register-form]', root);
   const status = $('[data-register-status]', root);
   const submit = $('[type=submit]', form);
+  const hint = $('[data-register-hint]', root);
+  const detailsStep = $('[data-register-step="details"]', root);
+  const verifyStep = $('[data-register-step="verify"]', root);
 
   // Live password checklist
   const rules = $$('[data-rule]', root);
@@ -366,52 +428,129 @@ function initRegister(root) {
       li.textContent = `${ok ? '✓' : '•'} ${li.textContent.replace(/^[✓•]\s*/, '')}`;
     });
   };
-  paintRules();
-  form.password.addEventListener('input', paintRules);
 
-  const fail = (field, text) => {
-    setStatus(status, text);
-    field?.focus();
+  // What is still missing? The button is only enabled when this list is empty.
+  const missing = () => {
+    const m = [];
+    if (!cleanName(form.firstName.value)) m.push('first name');
+    if (!cleanName(form.lastName.value)) m.push('last name');
+    if (!validEmail(form.email.value.trim())) m.push('a valid email');
+    if (!normalizeIndianMobile(form.phone.value)) m.push('a valid 10-digit mobile number');
+    if (!passwordOk(form.password.value)) m.push('a stronger password');
+    else if (form.password.value !== form.confirm.value) m.push('matching passwords');
+    if (!form.terms.checked) m.push('accepting the policies');
+    return m;
+  };
+  const update = () => {
+    paintRules();
+    const m = missing();
+    submit.disabled = m.length > 0;
+    hint.hidden = m.length === 0;
+    hint.textContent = m.length ? `Still needed: ${m.join(', ')}.` : '';
+  };
+  form.addEventListener('input', update);
+  form.addEventListener('change', update);
+  update();
+
+  let pending = null; // details kept in memory between step 1 and step 2 only
+
+  const showDetails = (msg) => {
+    verifyStep.hidden = true;
+    detailsStep.hidden = false;
+    setStatus(status, msg || '');
+    update();
   };
 
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const firstName = cleanName(form.firstName.value);
-    const lastName = cleanName(form.lastName.value);
-    const email = form.email.value.trim();
-    const phone = normalizeIndianMobile(form.phone.value);
-    const password = form.password.value;
-    if (!firstName) return fail(form.firstName, 'Please enter your first name.');
-    if (!lastName) return fail(form.lastName, 'Please enter your last name.');
-    if (!validEmail(email)) return fail(form.email, MESSAGES['auth/invalid-email']);
-    if (!phone) return fail(form.phone, MESSAGES['auth/invalid-phone-number']);
-    if (!passwordOk(password)) return fail(form.password, 'Your password needs 8+ characters with an uppercase letter, a lowercase letter and a number.');
-    if (password !== form.confirm.value) return fail(form.confirm, 'The two passwords don’t match.');
-    if (!form.terms.checked) return fail(form.terms, 'Please accept the privacy and refund policies to continue.');
+  const otp = otpFlow($('[data-otp-block]', verifyStep), {
+    start: (phone, verifier) => signInWithPhoneNumber(auth, phone, verifier),
+    done: async (cred) => {
+      registering = true;
+      // Number already belongs to an account → don't touch that account, just sign out again.
+      if (!getAdditionalUserInfo(cred)?.isNewUser) {
+        await signOut(auth);
+        registering = false;
+        throw restart('paloveena/phone-registered');
+      }
+      try {
+        await linkWithCredential(cred.user, EmailAuthProvider.credential(pending.email, pending.password));
+      } catch (err) {
+        await cred.user.delete().catch(() => signOut(auth)); // remove the half-made account
+        registering = false;
+        if (['auth/email-already-in-use', 'auth/credential-already-in-use'].includes(err?.code)) {
+          otp.reset();
+          showDetails(MESSAGES['auth/email-already-in-use']);
+          form.email.focus();
+          return;
+        }
+        throw restart(err?.code);
+      }
+      await updateProfile(cred.user, { displayName: `${pending.firstName} ${pending.lastName}` });
+      if ((await saveProfile(cred.user, { ...pending, phone: cred.user.phoneNumber })) === 'phone-taken') {
+        await cred.user.delete().catch(() => signOut(auth));
+        registering = false;
+        throw restart('paloveena/phone-registered');
+      }
+      withContinueUrl((s) => sendEmailVerification(cred.user, s), '/account/').catch(() => {}); // best effort; can be resent from the account page
+      pending = null;
+      location.replace(safeNext());
+    },
+  });
 
+  // Free plan (no SMS): create the account straight away; the database still refuses a mobile number
+  // that another account already uses.
+  async function createWithoutSms(phone) {
     registering = true;
     busy(submit, true, 'Creating account…');
     setStatus(status, '');
-    try {
-      const { user } = await createUserWithEmailAndPassword(auth, email, password);
-      await updateProfile(user, { displayName: `${firstName} ${lastName}` });
-      sendEmailVerification(user).catch(() => {}); // best effort; can be resent from the account page
-      // Step 2: verify the mobile so it's linked to this same account.
-      $('[data-register-step="details"]', root).hidden = true;
-      const step = $('[data-register-step="verify"]', root);
-      step.hidden = false;
-      otpFlow($('[data-otp-block]', step), {
-        phone,
-        start: (p, verifier) => linkWithPhoneNumber(auth.currentUser, p, verifier),
-        done: async () => location.replace(safeNext()),
-      });
-      $('[data-skip-verify]', root).addEventListener('click', () => location.replace(safeNext()));
-      $('[data-phone-form] [type=submit]', step).focus();
-    } catch (err) {
+    const fail = (text, field) => {
       registering = false;
-      setStatus(status, message(err));
       busy(submit, false);
+      update();
+      setStatus(status, text);
+      field?.focus();
+    };
+    let user;
+    try {
+      ({ user } = await createUserWithEmailAndPassword(auth, pending.email, pending.password));
+    } catch (err) {
+      return fail(message(err), err?.code === 'auth/email-already-in-use' ? form.email : null);
     }
+    try {
+      if ((await saveProfile(user, { ...pending, phone })) === 'phone-taken') {
+        await user.delete().catch(() => signOut(auth)); // remove the half-made account
+        return fail(MESSAGES['paloveena/phone-registered'], form.phone);
+      }
+      await updateProfile(user, { displayName: `${pending.firstName} ${pending.lastName}` });
+      withContinueUrl((s) => sendEmailVerification(user, s), '/account/').catch(() => {});
+      pending = null;
+      location.replace(safeNext());
+    } catch (err) {
+      await user.delete().catch(() => signOut(auth));
+      fail(message(err));
+    }
+  }
+
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    if (missing().length) return update();
+    pending = {
+      firstName: cleanName(form.firstName.value),
+      lastName: cleanName(form.lastName.value),
+      email: form.email.value.trim(),
+      password: form.password.value,
+    };
+    const phone = normalizeIndianMobile(form.phone.value);
+    if (!REQUIRE_SMS) return createWithoutSms(phone);
+    setStatus(status, '');
+    detailsStep.hidden = true;
+    verifyStep.hidden = false;
+    otp.reset(phone); // fresh step 2 with the number from the form
+    $('[data-phone-form] [type=submit]', verifyStep).focus();
+  });
+
+  $('[data-register-back]', root).addEventListener('click', () => {
+    otp.reset();
+    showDetails();
   });
 }
 
@@ -425,8 +564,8 @@ function initAccount(root) {
   const fmt = (s) => (s ? new Date(s).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }) : '—');
 
   // textContent (never innerHTML) for anything that comes from the account.
-  function render(user) {
-    const name = user.displayName || '';
+  function render(user, profile) {
+    const name = user.displayName || (profile ? `${profile.firstName} ${profile.lastName}` : '');
     $('[data-account-greeting]', root).textContent = name ? `, ${name.split(' ')[0]}` : '';
     $('[data-account-name]', root).textContent = name || '—';
     $('[data-account-email]', root).textContent = user.email || 'Not added';
@@ -435,9 +574,14 @@ function initAccount(root) {
     badge.textContent = user.emailVerified ? 'Verified' : 'Not verified';
     badge.className = `ml-2 rounded px-1.5 py-0.5 text-xs font-medium ${user.emailVerified ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}`;
     $('[data-email-unverified]', root).hidden = !user.email || user.emailVerified;
-    $('[data-account-phone]', root).textContent = user.phoneNumber ? pretty(user.phoneNumber) : 'Not verified yet';
-    $('[data-phone-badge]', root).hidden = !user.phoneNumber;
-    $('[data-verify-phone-card]', root).hidden = Boolean(user.phoneNumber);
+    const phone = user.phoneNumber || profile?.phone || '';
+    $('[data-account-phone]', root).textContent = phone ? pretty(phone) : 'Not added';
+    const phoneBadge = $('[data-phone-badge]', root);
+    phoneBadge.hidden = !phone;
+    phoneBadge.textContent = user.phoneNumber ? 'Verified' : 'Not verified';
+    phoneBadge.className = `ml-2 rounded px-1.5 py-0.5 text-xs font-medium ${user.phoneNumber ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}`;
+    // SMS verification is only offered once SMS is switched on (Blaze plan).
+    $('[data-verify-phone-card]', root).hidden = Boolean(user.phoneNumber) || !REQUIRE_SMS;
     $('[data-account-since]', root).textContent = fmt(user.metadata.creationTime);
     $('[data-account-last]', root).textContent = fmt(user.metadata.lastSignInTime);
     $('[data-account-loading]', root).hidden = true;
@@ -451,14 +595,18 @@ function initAccount(root) {
       return;
     }
     await reload(user).catch(() => {}); // pick up "email verified" if they clicked the link elsewhere
-    render(auth.currentUser || user);
+    const profile = await loadProfile(user.uid);
+    render(auth.currentUser || user, profile);
+    // Owner / staff get a button to the admin panel. (The panel and database check this again –
+    // the button is only a shortcut.)
+    getDoc(doc(db, '_access', 'staff')).then(() => ($('[data-admin-link]', root).hidden = false)).catch(() => {});
     if (ready) return;
     ready = true;
     otpFlow($('[data-verify-phone-card] [data-otp-block]', root), {
       start: (phone, verifier) => linkWithPhoneNumber(auth.currentUser, phone, verifier),
       done: async () => {
         await reload(auth.currentUser);
-        render(auth.currentUser);
+        render(auth.currentUser, await loadProfile(auth.currentUser.uid));
         setStatus(status, 'Your mobile number is verified. You can now also sign in with an SMS code.', true);
       },
     });
@@ -467,7 +615,7 @@ function initAccount(root) {
   $('[data-resend-verification]', root).addEventListener('click', async (e) => {
     e.target.disabled = true;
     try {
-      await sendEmailVerification(auth.currentUser);
+      await withContinueUrl((s) => sendEmailVerification(auth.currentUser, s), '/account/');
       setStatus(status, 'Verification email sent. Please check your inbox (and spam folder).', true);
     } catch (err) {
       setStatus(status, message(err));
@@ -483,7 +631,115 @@ function initAccount(root) {
   });
 }
 
-const pages = { '[data-login-page]': initLogin, '[data-register-page]': initRegister, '[data-account-page]': initAccount };
+/* ------------------------------------------------------------------ email links page (/auth/action/) */
+// Opened from Firebase's emails once the "Action URL" points here. Handles: verify email, reset password,
+// undo an email change. The one-time code is checked by Firebase; we remove it from the address bar at once.
+function initAction(root) {
+  const params = new URLSearchParams(location.search);
+  const mode = params.get('mode');
+  const code = params.get('oobCode');
+  const cont = params.get('continueUrl');
+  history.replaceState(null, '', location.pathname); // keep the one-time code out of history/bookmarks
+
+  // "Continue" only ever goes back to this site.
+  const safeContinue = (fallback) => {
+    try {
+      const u = new URL(cont);
+      if (u.origin === location.origin) return u.pathname + u.search;
+    } catch { /* missing or invalid */ }
+    return link(fallback);
+  };
+
+  const ICON_OK = '<svg class="h-8 w-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5L20 7"/></svg>';
+  const ICON_BAD = '<svg class="h-8 w-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 7v6M12 17h.01"/></svg>';
+  const show = ({ ok, title, text, button, href }) => {
+    $('[data-action-loading]', root).hidden = true;
+    $('[data-reset-form-wrap]', root).hidden = true;
+    $('[data-action-result]', root).hidden = false;
+    const icon = $('[data-action-icon]', root);
+    icon.innerHTML = ok ? ICON_OK : ICON_BAD; // fixed markup, no user data
+    icon.className = `mx-auto flex h-16 w-16 items-center justify-center rounded-full ${ok ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`;
+    $('[data-action-title]', root).textContent = title;
+    $('[data-action-text]', root).textContent = text;
+    const btn = $('[data-action-button]', root);
+    btn.textContent = button;
+    btn.href = href;
+    document.title = `${title} – Paloveenaa`;
+  };
+  const expired = (what, button, href) =>
+    show({ ok: false, title: 'This link has expired', text: `${what} links can only be used once and expire after a while.`, button, href });
+
+  if (!configured || !code || !mode) {
+    return show({ ok: false, title: 'Link not valid', text: 'This link is incomplete. Please open the most recent email we sent you.', button: 'Go to sign in', href: link('/login/') });
+  }
+
+  if (mode === 'verifyEmail') {
+    applyActionCode(auth, code)
+      .then(async () => {
+        if (auth.currentUser) await reload(auth.currentUser).catch(() => {});
+        show({ ok: true, title: 'Email verified', text: 'Thank you! Your email address is confirmed and your account is all set.', button: 'Continue', href: safeContinue('/account/') });
+      })
+      .catch((err) =>
+        ['auth/invalid-action-code', 'auth/expired-action-code'].includes(err?.code)
+          ? expired('Verification', 'Go to my account', link('/account/'))
+          : show({ ok: false, title: 'Something went wrong', text: message(err), button: 'Go to my account', href: link('/account/') })
+      );
+    return;
+  }
+
+  if (mode === 'resetPassword') {
+    verifyPasswordResetCode(auth, code)
+      .then((email) => {
+        $('[data-action-loading]', root).hidden = true;
+        $('[data-reset-form-wrap]', root).hidden = false;
+        $('[data-reset-email]', root).textContent = email;
+        const form = $('[data-reset-form]', root);
+        const submit = $('[type=submit]', form);
+        const statusEl = $('[data-reset-status]', root);
+        const update = () => {
+          const p = form.password.value;
+          $$('[data-rule]', root).forEach((li) => {
+            const ok = PASSWORD_RULES[li.dataset.rule](p);
+            li.classList.toggle('text-green-700', ok);
+            li.textContent = `${ok ? '✓' : '•'} ${li.textContent.replace(/^[✓•]\s*/, '')}`;
+          });
+          submit.disabled = !passwordOk(p) || p !== form.confirm.value;
+        };
+        form.addEventListener('input', update);
+        update();
+        form.password.focus();
+        form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          if (submit.disabled) return;
+          busy(submit, true, 'Saving…');
+          try {
+            await confirmPasswordReset(auth, code, form.password.value);
+            form.reset();
+            show({ ok: true, title: 'Password changed', text: 'Your new password is saved. You can now sign in with it.', button: 'Sign in', href: safeContinue('/login/') });
+          } catch (err) {
+            busy(submit, false);
+            if (['auth/invalid-action-code', 'auth/expired-action-code'].includes(err?.code)) expired('Password reset', 'Go to sign in', link('/login/'));
+            else setStatus(statusEl, message(err));
+          }
+        });
+      })
+      .catch(() => expired('Password reset', 'Go to sign in', link('/login/')));
+    return;
+  }
+
+  if (mode === 'recoverEmail') {
+    checkActionCode(auth, code)
+      .then((info) => applyActionCode(auth, code).then(() =>
+        show({ ok: true, title: 'Email restored', text: `Your sign-in email is back to ${info.data.email}. If you didn’t ask for the change, reset your password now.`, button: 'Reset my password', href: link('/login/') })
+      ))
+      .catch(() => expired('Email change', 'Go to sign in', link('/login/')));
+    return;
+  }
+
+  show({ ok: false, title: 'Link not valid', text: 'We couldn’t recognise this link. Please open the most recent email we sent you.', button: 'Go to sign in', href: link('/login/') });
+}
+
+const pages = { '[data-login-page]': initLogin, '[data-register-page]': initRegister, '[data-account-page]': initAccount, '[data-action-page]': initAction };
 for (const [sel, init] of Object.entries(pages)) {
   const root = $(sel);
   if (root) init(root);

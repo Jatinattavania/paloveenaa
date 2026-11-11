@@ -47,23 +47,30 @@ export const imageUrl = (name, w = 400) => link(`/assets/images/products/${name}
 
 const clampQty = (q) => Math.max(1, Math.min(99, Math.floor(Number(q)) || 1));
 
+/** A cart line is one product in one size; its key is "id:size" (size may be empty). */
+export const lineKey = (id, size = '') => `${Number(id)}:${size || ''}`;
+const saveCart = (items) => write(KEYS.cart, items.map(({ id, size, qty }) => ({ id, size, qty })));
+
 export const cart = {
-  items: () => read(KEYS.cart, []).filter((i) => i && i.id && i.qty > 0),
+  items: () =>
+    read(KEYS.cart, [])
+      .filter((i) => i && i.id && i.qty > 0)
+      .map((i) => ({ id: Number(i.id), size: String(i.size || ''), qty: clampQty(i.qty), key: lineKey(i.id, i.size) })),
   count() {
     return this.items().reduce((n, i) => n + i.qty, 0);
   },
-  add(id, qty = 1) {
+  add(id, qty = 1, size = '') {
     const items = this.items();
-    const line = items.find((i) => i.id === Number(id));
+    const line = items.find((i) => i.key === lineKey(id, size));
     if (line) line.qty = clampQty(line.qty + Number(qty));
-    else items.push({ id: Number(id), qty: clampQty(qty) });
-    write(KEYS.cart, items);
+    else items.push({ id: Number(id), size: String(size || ''), qty: clampQty(qty) });
+    saveCart(items);
   },
-  setQty(id, qty) {
-    write(KEYS.cart, this.items().map((i) => (i.id === Number(id) ? { ...i, qty: clampQty(qty) } : i)));
+  setQty(key, qty) {
+    saveCart(this.items().map((i) => (i.key === key ? { ...i, qty: clampQty(qty) } : i)));
   },
-  remove(id) {
-    write(KEYS.cart, this.items().filter((i) => i.id !== Number(id)));
+  remove(key) {
+    saveCart(this.items().filter((i) => i.key !== key));
   },
   clear() {
     write(KEYS.cart, []);
@@ -110,7 +117,7 @@ export async function cartSummary() {
     .items()
     .map((i) => {
       const p = catalog.find((x) => x.id === i.id);
-      return p ? { ...p, qty: i.qty, lineTotal: p.price * i.qty } : null;
+      return p ? { ...p, key: i.key, size: i.size, qty: i.qty, lineTotal: p.price * i.qty } : null;
     })
     .filter(Boolean);
   const subtotal = lines.reduce((s, l) => s + l.lineTotal, 0);

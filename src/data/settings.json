@@ -27,11 +27,13 @@
   },
 
   "firebase": {
-    "_help": "Mobile-number login. Create a Firebase project, enable Authentication > Phone, add a Web app and paste its config values here (they are public identifiers, not secrets). See README > Login.",
+    "_help": "Customer accounts + orders database. Paste the Firebase web app config here (public identifiers, not secrets). See README > Customer accounts. Admin/staff emails live in src/data/admins.json (private, not uploaded to GitHub).",
     "apiKey": "AIzaSyAOtj3miB8nHsX89zWB9y7MzF-hhw1fJP4",
     "authDomain": "otp-c2f2a.firebaseapp.com",
     "projectId": "otp-c2f2a",
-    "appId": "1:1004835993742:web:7e1fdc98585f5d9ce8b1df"
+    "appId": "1:1004835993742:web:7e1fdc98585f5d9ce8b1df",
+    "_help_sms": "true = new accounts must verify their mobile by SMS (needs the Firebase Blaze plan). false = mobile saved without SMS (still unique per account).",
+    "requirePhoneVerification": false
   },
 
   "forms": {

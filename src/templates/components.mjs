@@ -38,6 +38,84 @@ export function productCard(p, { sizes = '(min-width: 1024px) 270px, 50vw', cls 
 </article>`;
 }
 
+// Size buttons (radio group). Same markup is built in src/js/ui.js for the quick view – keep them in sync.
+export const SIZE_BTN =
+  'flex h-11 min-w-[3.25rem] cursor-pointer items-center justify-center rounded-md border border-line bg-white px-3 text-sm font-medium text-ink transition hover:border-brand peer-checked:border-brand peer-checked:bg-brand peer-checked:text-white peer-focus-visible:ring-2 peer-focus-visible:ring-brand peer-focus-visible:ring-offset-2 peer-disabled:cursor-not-allowed peer-disabled:bg-soft peer-disabled:text-muted/60 peer-disabled:line-through peer-disabled:hover:border-line';
+
+export function sizePicker(p, prefix) {
+  if (!p.sizes?.length) return '';
+  const soldOut = new Set(p.soldOutSizes || []);
+  return `<fieldset data-size-picker>
+    <legend class="sr-only">Size</legend>
+    <div class="flex items-center justify-between gap-4">
+      <p class="text-sm font-medium text-ink">Size: <span class="font-normal text-muted" data-size-label>Select a size</span></p>
+      <button type="button" class="inline-flex items-center gap-1.5 text-sm text-brand underline-offset-2 hover:underline" data-open-size-chart>${icon('ruler', 'h-4 w-4')}Size chart</button>
+    </div>
+    <div class="mt-3 flex flex-wrap gap-2">
+      ${p.sizes
+        .map((s) => {
+          const out = soldOut.has(s);
+          return `<label title="${out ? `${esc(s)} – sold out` : esc(s)}"><input type="radio" name="size" value="${esc(s)}" class="peer sr-only" id="${prefix}-size-${esc(s)}"${out ? ' disabled' : ''}><span class="${SIZE_BTN}">${esc(s)}</span></label>`;
+        })
+        .join('')}
+    </div>
+    <p class="mt-2 text-sm text-red-700" data-size-error hidden role="alert">Please select a size.</p>
+  </fieldset>`;
+}
+
+// Amazon-style size chart popup (native <dialog>): "Size chart" + "How to measure" tabs, inches/cm switch.
+export function sizeChartDialog(chart) {
+  if (!chart) return '';
+  const cm = (n) => (Math.round(n * 2.54 * 2) / 2).toString();
+  const tab = (id, label, on) =>
+    `<button type="button" role="tab" aria-selected="${on}" class="flex-1 border-b-2 py-3 text-sm font-medium transition aria-selected:border-brand aria-selected:text-ink border-transparent text-muted hover:text-ink" data-chart-tab="${id}">${label}</button>`;
+  return `<dialog id="size-chart" class="m-auto max-h-[90vh] w-[min(680px,calc(100vw-2rem))] overflow-hidden rounded-lg p-0 text-muted shadow-2xl backdrop:bg-black/50" aria-labelledby="size-chart-title">
+  <div class="flex max-h-[90vh] flex-col">
+    <div class="flex items-center justify-between border-b border-line px-6 py-4">
+      <h2 id="size-chart-title" class="text-xl font-medium">${esc(chart.title)}</h2>
+      <button type="button" class="icon-btn -mr-2" data-dialog-close aria-label="Close size chart">${icon('close', 'h-6 w-6')}</button>
+    </div>
+    <div class="flex border-b border-line px-6" role="tablist">${tab('chart', 'Size chart', true)}${tab('measure', 'How to measure', false)}</div>
+    <div class="overflow-y-auto px-6 py-5">
+      <div data-chart-panel="chart">
+        <div class="mb-4 flex items-center justify-between gap-4">
+          <p class="text-sm">Body measurements</p>
+          <div class="inline-flex rounded-md border border-line p-0.5 text-sm" role="group" aria-label="Units">
+            <button type="button" class="rounded px-3 py-1 aria-pressed:bg-ink aria-pressed:text-white" aria-pressed="true" data-unit="in">Inches</button>
+            <button type="button" class="rounded px-3 py-1 aria-pressed:bg-ink aria-pressed:text-white" aria-pressed="false" data-unit="cm">CM</button>
+          </div>
+        </div>
+        <div class="overflow-x-auto rounded-md border border-line">
+          <table class="w-full text-center text-sm">
+            <thead class="bg-soft text-ink"><tr><th scope="col" class="px-2 py-3 text-left font-medium sm:px-3">Size</th>${chart.columns.map((c) => `<th scope="col" class="px-1.5 py-3 font-medium sm:px-3">${esc(c.label)}</th>`).join('')}</tr></thead>
+            <tbody class="divide-y divide-line">
+              ${chart.rows
+                .map(
+                  (r) => `<tr data-chart-row="${esc(r.size)}" class="transition data-[selected]:bg-brand-light data-[selected]:font-medium data-[selected]:text-ink"><th scope="row" class="px-2 py-3 text-left font-medium text-ink sm:px-3">${esc(r.size)}</th>${chart.columns
+                    .map((c) => `<td class="px-1.5 py-3 sm:px-3" data-in="${r[c.key]}" data-cm="${cm(r[c.key])}">${r[c.key]}</td>`)
+                    .join('')}</tr>`
+                )
+                .join('')}
+            </tbody>
+          </table>
+        </div>
+        <p class="mt-4 rounded-md bg-soft p-3 text-sm">${icon('check', 'mr-1 inline h-4 w-4 text-brand')}${esc(chart.note)}</p>
+      </div>
+      <div data-chart-panel="measure" hidden>
+        <p class="mb-4 text-sm">Use a soft measuring tape and keep it snug but not tight. Measure over light clothing.</p>
+        <ol class="space-y-4">
+          ${chart.howToMeasure
+            .map(
+              (m, i) => `<li class="flex gap-4"><span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand text-sm font-medium text-white">${i + 1}</span><div><p class="font-medium text-ink">${esc(m.label)}</p><p class="text-sm">${esc(m.text)}</p></div></li>`
+            )
+            .join('')}
+        </ol>
+      </div>
+    </div>
+  </div>
+</dialog>`;
+}
+
 export function breadcrumbs(items, light = false) {
   return `<nav aria-label="Breadcrumb"><ol class="flex flex-wrap items-center justify-center gap-1.5 text-[15px] ${light ? 'text-white' : ''}">
     ${items

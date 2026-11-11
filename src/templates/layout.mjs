@@ -1,5 +1,6 @@
 // Page shell: <head>, announcement bar, header, drawers, footer.
 import { esc, icon, IMG, productImg, honeypot } from './helpers.mjs';
+import { sizeChartDialog } from './components.mjs';
 
 const NAV = [
   { label: 'Home', href: '/' },
@@ -12,7 +13,7 @@ const NAV = [
 
 const isActive = (href, path) => (href === '/' ? path === '/' : path.startsWith(href) || (href === '/shop/' && /^\/(product|product-category)\//.test(path)));
 
-function head(ctx, { title, description, image, canonical, jsonLd, noindex, scripts = [] }) {
+function head(ctx, { title, description, image, canonical, jsonLd, noindex, scripts = [], referrer = 'strict-origin-when-cross-origin', bare = false }) {
   const { settings, v } = ctx;
   const fullTitle = title ? `${title} – ${settings.siteName}` : `${settings.siteName} – Elegant Ethnic Wear for Women`;
   const desc = description || settings.description;
@@ -22,7 +23,7 @@ function head(ctx, { title, description, image, canonical, jsonLd, noindex, scri
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="${esc(ctx.csp)}">
-<meta name="referrer" content="strict-origin-when-cross-origin">
+<meta name="referrer" content="${referrer}">
 <title>${esc(fullTitle)}</title>
 <meta name="description" content="${esc(desc)}">
 <link rel="canonical" href="${url}">
@@ -39,7 +40,7 @@ ${noindex ? '<meta name="robots" content="noindex">' : ''}
 <link rel="apple-touch-icon" href="${IMG}/brand/favicon.png">
 <link rel="preload" href="/assets/fonts/jost.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/css/styles.css?v=${v}">
-<script type="module" src="/assets/js/app.js?v=${v}"></script>
+${bare ? '' : `<script type="module" src="/assets/js/app.js?v=${v}"></script>`}
 ${scripts.map((s) => `<script type="module" src="/assets/js/${s}?v=${v}"></script>`).join('\n')}
 ${jsonLd ? `<script type="application/ld+json">${JSON.stringify(jsonLd)}</script>` : ''}
 </head>`;
@@ -243,6 +244,17 @@ function footer(ctx) {
  * @param body main content HTML
  */
 export function layout(ctx, meta, body) {
+  // "bare" pages (the admin panel) get only <head> + their own content: no shop header/footer/drawers.
+  if (meta.bare) {
+    return `<!doctype html>
+<html lang="en">
+${head(ctx, { ...meta, canonical: ctx.path })}
+<body class="bg-soft">
+${body}
+<div class="toast pointer-events-none fixed bottom-5 left-1/2 z-[60] -translate-x-1/2 translate-y-4 rounded-md bg-ink px-5 py-3 text-sm text-white opacity-0 shadow-lg" role="status" aria-live="polite" data-toast></div>
+</body>
+</html>`;
+  }
   return `<!doctype html>
 <html lang="en">
 ${head(ctx, { ...meta, canonical: ctx.path })}
@@ -258,6 +270,7 @@ ${footer(ctx)}
 ${mobileMenu(ctx)}
 ${miniCart()}
 ${quickView()}
+${sizeChartDialog(ctx.catalog.sizeChart)}
 <div class="toast pointer-events-none fixed bottom-5 left-1/2 z-[60] -translate-x-1/2 translate-y-4 rounded-md bg-ink px-5 py-3 text-sm text-white opacity-0 shadow-lg" role="status" aria-live="polite" data-toast></div>
 </body>
 </html>`;

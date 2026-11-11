@@ -33,6 +33,10 @@ Without dev mode:
 2. Run `npm run build` in this folder. This regenerates every page in `website/` and the CSS.
 3. If you added or replaced photos in `src/images/`, run `npm run images` first.
 
+**Sizes and size chart:** in `src/data/products.json`:
+- Each product has `"sizes"` (e.g. `["XS","S","M","L","XL","XXL"]`) and `"soldOutSizes"` (e.g. `["XXL"]`, which shows that size greyed out).
+- The `"sizeChart"` section at the top holds the measurements in inches (cm is calculated automatically) and the "How to measure" tips. It's a standard Indian women's ethnic-wear chart, so adjust it to your garments.
+
 **To add a product:** put its photos in `src/images/products/` (e.g. `IMG_3001.jpg`), run `npm run images`, then add an entry to `src/data/products.json` (copy an existing one and change `id`, `slug`, `name`, prices, `categories`, `image`, `gallery`). Run `npm run build`.
 
 ## Orders, contact form and newsletter
@@ -48,7 +52,11 @@ No payment is taken on the website. Checkout tells the customer you will contact
 
 Pages: `/register/` (create account), `/login/` and `/account/` (the person icon in the header).
 
-- **Create account:** first name, last name, email, mobile, password and re-entered password. The password needs 8+ characters with upper- and lower-case letters and a number. A verification email is sent. The customer then confirms their mobile with an SMS code, which links it to the same account. They can skip this and do it later from *My account*.
+- **Create account:** first name, last name, email, mobile, password and re-entered password. The password needs 8+ characters with upper- and lower-case letters and a number. The button stays disabled until everything is valid and the policies are accepted.
+  - The customer must then verify their mobile with an SMS code. The account is only created after that.
+  - **The same mobile or email can't be registered twice.** A mobile that already has an account is refused, and so is an email that's already used; no half-made account is left behind.
+  - A verification email is sent.
+  - Mobile OTP login only works for registered numbers; unknown numbers are asked to create an account.
 - **Sign in:** two tabs, **Email & password** (with "Forgot password?") or **Mobile OTP**. Both open the same account once the mobile is verified.
 
 This uses **Firebase Authentication** (Google). Passwords are hashed and checked only on Firebase's servers. SMS codes are generated and verified there too, and Firebase manages the sessions. Until it's configured, the pages show "Login is being set up".
@@ -68,6 +76,17 @@ This uses **Firebase Authentication** (Google). Passwords are hashed and checked
 7. **Billing → Budgets & alerts:** set a monthly budget with email alerts, so unusual SMS usage is noticed immediately.
 8. *(Optional)* **Authentication → Sign-in method → Phone → Phone numbers for testing:** add a fake number and code for testing without sending real SMS.
 
+### Professional-looking account emails
+
+By default Firebase sends from `noreply@<project>.firebaseapp.com`, signs off as the project ID, and often lands in spam. To brand the emails:
+
+1. **Project settings → General → Public-facing name:** `Paloveenaa`.
+2. **Authentication → Templates → Email address verification → ✏️ edit.** Repeat for **Password reset**.
+   - **Sender name** `Paloveenaa`, **Reply-to** `info@paloveenaa.com`, **Subject** e.g. `Confirm your email for Paloveenaa`.
+   - **From → Customize domain → `paloveenaa.com`:** add the DNS records Firebase shows in Hostinger hPanel → Domains → DNS. Emails then come from `noreply@paloveenaa.com` with SPF/DKIM, which is the main fix for spam.
+   - **Customize action URL → `https://paloveenaa.com/auth/action/`**, only once the new site is live on paloveenaa.com. Links then open the site's own branded page for "Email verified" and "Set a new password".
+3. A fully designed email with your logo and a big button, like Amazon's, needs the site to send its own emails. That means a Firebase Cloud Function (Blaze plan) plus an email service such as Resend, Brevo or Zoho ZeptoMail.
+
 ### How it is secured
 
 | Risk | Protection |
@@ -84,6 +103,22 @@ This uses **Firebase Authentication** (Google). Passwords are hashed and checked
 | Session lifetime | 1-hour tokens, refreshed automatically by Firebase. "Sign out" ends the session on that device. |
 
 Note: login currently identifies the customer. It doesn't unlock any private data, because orders still go by email. If you later store orders or addresses in a database, that server **must verify the Firebase ID token** on every request. Never trust the browser alone.
+
+## Orders & admin panel (Phase 1, free Firebase plan)
+
+- **Customers:** must sign in to check out. Orders are saved in the Firestore database (cash on delivery for now). *My account → My orders* shows each order's status and tracking, and lets the customer cancel before it's packed.
+- **Owner and staff:** open **`/admin/`** (also linked from *My account*). It has:
+  - **Dashboard:** new / to pack / to ship counts, today's orders and, for the owner only, sales.
+  - **Orders:** live list with status tabs and search. The order panel has the customer, address, items with sizes, a price check, the next step (Confirm → Packed → Shipped with courier and tracking → Delivered), cancel with a reason, an internal note, the timeline and a printable slip.
+  - **Customers** and **Team & access**.
+- **Who has access:** set in `src/data/admins.json`. This file is private and not uploaded to GitHub. After editing it, run `npm run deploy:rules`. People sign in with those emails, and the email must be verified.
+- **Security:** `src/firestore.rules` decides what each person can read or change:
+  - customers only see their own orders;
+  - nobody can fake a status, payment or history;
+  - one mobile number per account;
+  - only the listed owner and staff can see all orders.
+- **Free-plan limitation:** orders are written by the customer's browser, so the admin panel compares every order with the current price list and shows a red ⚠ if it doesn't match. On the Blaze plan this moves to server code.
+- **SMS verification at sign-up:** turn it on with `"requirePhoneVerification": true` in `settings.json`, once on Blaze.
 
 ## Things to update (carried over from WordPress)
 

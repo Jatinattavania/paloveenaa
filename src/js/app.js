@@ -2,7 +2,7 @@
 import config from './config.js';
 import { cart, wishlist, onChange, cartSummary, findProduct, getCatalog, money, link } from './store.js';
 import { renderMiniCart, renderCartPage, renderCheckoutSummary, renderWishlistPage, renderQuickView, updateBadges, esc } from './ui.js';
-import { send, formData, validate, hasService, mailtoUrl } from './forms.js';
+import { send, formData, validate } from './forms.js';
 
 // Clickjacking guard: refuse to be shown inside another site's frame. (On Hostinger the .htaccess headers
 // already block this; GitHub Pages can't send those headers, so this covers it.)
@@ -60,6 +60,7 @@ function close() {
 }
 
 document.addEventListener('keydown', (e) => {
+  if ($('dialog[open]')) return; // the size chart (native dialog) handles its own Esc / focus
   if (e.key === 'Escape') close();
   // Keep keyboard focus inside an open drawer/modal.
   if (e.key === 'Tab' && openDrawer) {
@@ -71,13 +72,58 @@ document.addEventListener('keydown', (e) => {
 });
 
 /* ------------------------------------------------------------------ cart actions */
-async function addToCart(id, qty = 1, { openCart = true } = {}) {
+/** Adds to cart. Products with sizes need one: without it (e.g. from a product card) the quick view opens to pick. */
+async function addToCart(id, qty = 1, { size = '', openCart = true } = {}) {
   const p = await findProduct(id);
-  if (!p || !p.inStock) return toast('Sorry, this product is not available.');
-  cart.add(id, qty);
-  toast(`“${p.name}” added to your cart`);
+  if (!p || !p.inStock) { toast('Sorry, this product is not available.'); return false; }
+  if (p.sizes?.length && !size) {
+    open('quick-view');
+    await renderQuickView(id);
+    toast('Please choose your size');
+    return false;
+  }
+  if (size && (!p.sizes.includes(size) || p.soldOutSizes.includes(size))) { toast('Sorry, that size is not available.'); return false; }
+  cart.add(id, qty, size);
+  toast(`“${p.name}”${size ? ` (size ${size})` : ''} added to your cart`);
   if (openCart) open('mini-cart');
+  return true;
 }
+
+/** The size chosen in a product form, or null (and a visible prompt) if one is needed but missing. */
+function chosenSize(form) {
+  const picker = form && $('[data-size-picker]', form);
+  if (!picker) return '';
+  const checked = $('input[name=size]:checked', picker);
+  if (checked) return checked.value;
+  $('[data-size-error]', picker).hidden = false;
+  $('input[name=size]:not(:disabled)', picker)?.focus();
+  return null;
+}
+
+/* ------------------------------------------------------------------ size chart (native <dialog>) */
+const UNIT_KEY = 'pv-size-unit';
+function setUnit(dlg, unit) {
+  $$('[data-unit]', dlg).forEach((b) => b.setAttribute('aria-pressed', b.dataset.unit === unit));
+  $$('td[data-in]', dlg).forEach((td) => (td.textContent = unit === 'cm' ? td.dataset.cm : td.dataset.in));
+  try { localStorage.setItem(UNIT_KEY, unit); } catch { /* ignore */ }
+}
+function showChartTab(dlg, tab) {
+  $$('[data-chart-tab]', dlg).forEach((b) => b.setAttribute('aria-selected', b.dataset.chartTab === tab));
+  $$('[data-chart-panel]', dlg).forEach((p) => (p.hidden = p.dataset.chartPanel !== tab));
+}
+function openSizeChart(from) {
+  const dlg = $('#size-chart');
+  if (!dlg) return;
+  const size = from?.closest('form')?.querySelector('input[name=size]:checked')?.value;
+  $$('[data-chart-row]', dlg).forEach((r) => r.toggleAttribute('data-selected', r.dataset.chartRow === size));
+  let unit = 'in';
+  try { unit = localStorage.getItem(UNIT_KEY) || 'in'; } catch { /* ignore */ }
+  setUnit(dlg, unit);
+  showChartTab(dlg, 'chart');
+  dlg.showModal();
+}
+// Click on the dark backdrop closes the chart.
+$('#size-chart')?.addEventListener('click', (e) => { if (e.target === e.currentTarget) e.currentTarget.close(); });
 
 /* ------------------------------------------------------------------ global click handling */
 document.addEventListener('click', async (e) => {
@@ -89,11 +135,18 @@ document.addEventListener('click', async (e) => {
   if (d.open) { e.preventDefault(); open(d.open); return; }
   if ('close' in d || 'overlay' in d) { close(); return; }
 
+  if ('openSizeChart' in d) { openSizeChart(t); return; }
+  if ('dialogClose' in d) { t.closest('dialog')?.close(); return; }
+  if (d.chartTab) { showChartTab(t.closest('dialog'), d.chartTab); return; }
+  if (d.unit) { setUnit(t.closest('dialog'), d.unit); return; }
+
   if (d.addToCart) { addToCart(d.addToCart); return; }
   if (d.buyNow) {
-    const qty = $(`[data-product-form="${d.buyNow}"] input[name=qty]`)?.value || 1;
-    cart.add(d.buyNow, qty);
-    window.location.href = link('/checkout/');
+    const form = $(`[data-product-form="${d.buyNow}"]`);
+    const size = chosenSize(form);
+    if (size === null) return;
+    const qty = Number(form?.qty?.value) || 1;
+    if (await addToCart(d.buyNow, qty, { size, openCart: false })) window.location.href = link('/checkout/');
     return;
   }
   if (d.wishlist) {
@@ -107,11 +160,11 @@ document.addEventListener('click', async (e) => {
 
   if (d.cartRemove) { cart.remove(d.cartRemove); return; }
   if (d.cartInc || d.cartDec) {
-    const id = Number(d.cartInc || d.cartDec);
-    const line = cart.items().find((i) => i.id === id);
+    const key = d.cartInc || d.cartDec; // "id:size"
+    const line = cart.items().find((i) => i.key === key);
     if (!line) return;
-    if (d.cartDec && line.qty <= 1) cart.remove(id);
-    else cart.setQty(id, line.qty + (d.cartInc ? 1 : -1));
+    if (d.cartDec && line.qty <= 1) cart.remove(key);
+    else cart.setQty(key, line.qty + (d.cartInc ? 1 : -1));
     return;
   }
   if ('couponRemove' in d) { cart.removeCoupon(); return; }
@@ -134,6 +187,14 @@ document.addEventListener('click', async (e) => {
 document.addEventListener('change', (e) => {
   const qty = e.target.closest('[data-cart-qty]');
   if (qty) cart.setQty(qty.dataset.cartQty, qty.value);
+  // Size picked → show it next to "Size:" and clear any "please select" prompt.
+  if (e.target.matches('[data-size-picker] input[name=size]')) {
+    const picker = e.target.closest('[data-size-picker]');
+    const label = $('[data-size-label]', picker);
+    label.textContent = e.target.value;
+    label.className = 'font-medium text-ink';
+    $('[data-size-error]', picker).hidden = true;
+  }
 });
 
 document.addEventListener('submit', async (e) => {
@@ -141,10 +202,11 @@ document.addEventListener('submit', async (e) => {
 
   if (form.matches('[data-product-form]')) {
     e.preventDefault();
+    const size = chosenSize(form);
+    if (size === null) return; // "Please select a size." is now showing
     const qty = Number(form.qty.value) || 1;
-    const inModal = form.closest('#quick-view');
-    if (inModal) close();
-    addToCart(form.dataset.productForm, qty);
+    if (form.closest('#quick-view')) close();
+    addToCart(form.dataset.productForm, qty, { size });
     return;
   }
 
@@ -162,7 +224,6 @@ document.addEventListener('submit', async (e) => {
 
   if (form.matches('[data-form="contact"]')) return submitContact(e, form);
   if (form.matches('[data-form="newsletter"]')) return submitNewsletter(e, form);
-  if (form.matches('[data-checkout-form]')) return submitOrder(e, form);
 });
 
 /* ------------------------------------------------------------------ carousels */
@@ -302,104 +363,7 @@ async function submitNewsletter(e, form) {
   status(form, res.method === 'mailto' ? 'Your email app has opened – press Send to subscribe.' : 'Thank you for subscribing!');
 }
 
-/* ------------------------------------------------------------------ checkout */
-const ORDER_KEY = 'pv-last-order';
-
-function orderText(o) {
-  const lines = o.items.map((l) => `• ${l.name} (product #${l.id}) — ${l.qty} × ${money(l.price)} = ${money(l.lineTotal)}`).join('\n');
-  const c = o.customer;
-  return `New order ${o.number} (${o.date})
-
-ITEMS
-${lines}
-
-Subtotal: ${money(o.subtotal)}${o.coupon ? `\nCoupon ${o.coupon.code} (${o.coupon.pct}% off): −${money(o.discount)}` : ''}
-Shipping: ${o.shipping ? money(o.shipping) : 'Free'}
-TOTAL: ${money(o.total)}
-
-CUSTOMER
-${c.firstName} ${c.lastName}
-Phone: ${c.phone}
-Email: ${c.email}
-
-SHIPPING ADDRESS
-${c.address}
-${c.city}, ${c.state} ${c.pincode}
-${c.country}
-${c.notes ? `\nNOTES\n${c.notes}` : ''}
-
----
-SHOP NOTE: totals are calculated in the customer's browser. Before confirming, check each product's
-price against your current price list (product # = ID in src/data/products.json).`;
-}
-
-async function submitOrder(e, form) {
-  e.preventDefault();
-  if (isBot(form)) return status(form, 'Thank you! Your order has been received.');
-  if (!validate(form)) return;
-  const s = await cartSummary();
-  if (!s.lines.length) return status(form, 'Your cart is empty.', false);
-  const btn = form.querySelector('[type=submit]');
-  btn.disabled = true;
-  btn.textContent = 'Placing order…';
-  const now = new Date();
-  const number = `PV-${now.toISOString().slice(2, 10).replace(/-/g, '')}-${Math.floor(1000 + Math.random() * 9000)}`;
-  const customer = formData(form);
-  delete customer.terms;
-  delete customer.botcheck;
-  const order = {
-    number,
-    date: now.toLocaleString('en-IN'),
-    items: s.lines.map((l) => ({ id: l.id, name: l.name, qty: l.qty, price: l.price, lineTotal: l.lineTotal })),
-    subtotal: s.subtotal, coupon: s.coupon, discount: s.discount, shipping: s.shipping, total: s.total, customer,
-  };
-  const subject = `New order ${number} – ${money(order.total)} – ${config.siteName}`;
-  const text = orderText(order);
-  let method = 'mailto';
-  if (hasService()) {
-    const res = await send(subject, { name: `${customer.firstName} ${customer.lastName}`, email: customer.email, phone: customer.phone, replyto: customer.email, order_number: number, order_total: money(order.total) }, text);
-    if (!res.ok) {
-      btn.disabled = false;
-      btn.textContent = 'Place order';
-      return status(form, `Sorry, we couldn't place your order right now. Please try again, or email us at ${config.email}.`, false);
-    }
-    method = 'service';
-  }
-  try { sessionStorage.setItem(ORDER_KEY, JSON.stringify({ ...order, method, mailto: method === 'mailto' ? mailtoUrl(subject, text) : null })); } catch { /* ignore */ }
-  cart.clear();
-  window.location.href = link('/order-received/');
-}
-
-function renderOrderReceived() {
-  const root = $('[data-order-received]');
-  if (!root) return;
-  let o = null;
-  try { o = JSON.parse(sessionStorage.getItem(ORDER_KEY)); } catch { /* ignore */ }
-  if (!o) {
-    root.innerHTML = `<p class="py-10 text-center">There is no recent order to show. <a href="${link('/shop/')}" class="text-brand underline">Continue shopping</a></p>`;
-    return;
-  }
-  const mail = o.method === 'mailto';
-  root.innerHTML = `<div class="rounded-lg border-t-[3px] border-brand bg-[#F8F8F8] p-6 text-ink md:p-8">
-    <p class="text-xl font-medium">${mail ? 'Almost done – please send your order email' : 'Thank you. Your order has been received.'}</p>
-    <p class="mt-2 text-muted">${mail
-      ? `Your email app should have opened with your order details addressed to ${esc(config.email)}. <strong class="text-ink">Please press Send</strong> so we receive your order. If it didn't open, use the button below.`
-      : `We will contact you on ${esc(o.customer.phone)} / ${esc(o.customer.email)} to confirm your order and arrange payment.`}</p>
-    ${mail ? `<a href="${esc(o.mailto)}" class="btn-brand mt-5">Send order email</a>` : ''}
-  </div>
-  <dl class="mt-8 grid gap-4 text-sm sm:grid-cols-3">
-    <div><dt class="uppercase tracking-[0.12em]">Order number</dt><dd class="mt-1 text-lg font-medium text-ink">${esc(o.number)}</dd></div>
-    <div><dt class="uppercase tracking-[0.12em]">Date</dt><dd class="mt-1 text-lg font-medium text-ink">${esc(o.date)}</dd></div>
-    <div><dt class="uppercase tracking-[0.12em]">Total</dt><dd class="mt-1 text-lg font-medium text-ink">${money(o.total)}</dd></div>
-  </dl>
-  <h2 class="mb-4 mt-10 text-2xl font-medium">Order details</h2>
-  <ul class="divide-y divide-line border-y border-line">${o.items.map((l) => `<li class="flex justify-between py-3"><span class="text-ink">${esc(l.name)} × ${Number(l.qty) || 0}</span><span class="text-ink">${money(l.lineTotal)}</span></li>`).join('')}</ul>
-  <a href="${link('/shop/')}" class="btn-outline mt-10">Continue shopping</a>`;
-  if (mail && !sessionStorage.getItem(ORDER_KEY + '-opened')) {
-    sessionStorage.setItem(ORDER_KEY + '-opened', '1');
-    window.location.href = o.mailto;
-  }
-}
+/* Checkout, order confirmation and 'My orders' live in orders.js (loaded only on those pages). */
 
 /* ------------------------------------------------------------------ boot */
 function refresh() {
@@ -416,6 +380,5 @@ $$('[data-carousel]').forEach(initCarousel);
 $$('[data-lookbook]').forEach(initLookbook);
 initSort();
 initContactRemember();
-renderOrderReceived();
 // Prefetch product data shortly after load so quick view / cart feel instant.
 (window.requestIdleCallback || setTimeout)(() => getCatalog().catch(() => {}));
